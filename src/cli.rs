@@ -24,6 +24,8 @@ pub enum Commands {
     ShowConfig,
     /// Configure TeaQL in the current workspace.
     Config,
+    /// Install symlink aliases for cargo-style command names.
+    InstallLinks(InstallLinksArgs),
 }
 
 #[derive(Debug, Args)]
@@ -46,4 +48,15 @@ pub struct GenerateArgs {
     /// Override request timeout in seconds.
     #[arg(long)]
     pub timeout_seconds: Option<u64>,
+}
+
+#[derive(Debug, Args)]
+pub struct InstallLinksArgs {
+    /// Directory where symlinks should be created. Defaults to the current executable directory.
+    #[arg(long)]
+    pub dir: Option<PathBuf>,
+
+    /// Replace existing files or symlinks when needed.
+    #[arg(long)]
+    pub force: bool,
 }

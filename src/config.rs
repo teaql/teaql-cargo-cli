@@ -103,7 +103,7 @@ impl TeaqlConfig {
 
 pub fn config_file_path() -> Result<PathBuf> {
     let home = env::var_os("HOME").context("HOME environment variable is not set")?;
-    Ok(PathBuf::from(home).join(".teaql").join("config.yml"))
+    Ok(config_file_path_from_home(Path::new(&home)))
 }
 
 pub fn run_wizard(existing: TeaqlConfig) -> Result<TeaqlConfig> {
@@ -163,5 +163,73 @@ fn normalize_path(path: PathBuf, cwd: &Path) -> PathBuf {
         path
     } else {
         cwd.join(path)
+    }
+}
+
+fn config_file_path_from_home(home: &Path) -> PathBuf {
+    home.join(".teaql").join("config.yml")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn config_file_path_uses_home_directory() {
+        let path = config_file_path_from_home(Path::new("/tmp/alice"));
+        assert_eq!(path, PathBuf::from("/tmp/alice/.teaql/config.yml"));
+    }
+
+    #[test]
+    fn resolve_uses_defaults_and_normalizes_relative_paths() {
+        let cwd = Path::new("/workspace/project");
+        let config = TeaqlConfig {
+            service_url: "https://example.com/generate".to_string(),
+            license_file: Some(PathBuf::from("licenses/public.LICENSE")),
+            build_dir: PathBuf::from("dist"),
+            timeout_seconds: 42,
+        };
+
+        let resolved = config.resolve(
+            ConfigOverrides {
+                service_url: None,
+                license_file: None,
+                build_dir: None,
+                timeout_seconds: None,
+            },
+            cwd,
+        );
+
+        assert_eq!(resolved.service_url, "https://example.com/generate");
+        assert_eq!(
+            resolved.license_file,
+            PathBuf::from("/workspace/project/licenses/public.LICENSE")
+        );
+        assert_eq!(resolved.build_dir, PathBuf::from("/workspace/project/dist"));
+        assert_eq!(resolved.timeout_seconds, 42);
+    }
+
+    #[test]
+    fn resolve_applies_overrides() {
+        let cwd = Path::new("/workspace/project");
+        let config = TeaqlConfig::default();
+
+        let resolved = config.resolve(
+            ConfigOverrides {
+                service_url: Some("https://override.test/generate".to_string()),
+                license_file: Some(PathBuf::from("/tmp/license.txt")),
+                build_dir: Some(PathBuf::from("custom-build")),
+                timeout_seconds: Some(15),
+            },
+            cwd,
+        );
+
+        assert_eq!(resolved.service_url, "https://override.test/generate");
+        assert_eq!(resolved.license_file, PathBuf::from("/tmp/license.txt"));
+        assert_eq!(
+            resolved.build_dir,
+            PathBuf::from("/workspace/project/custom-build")
+        );
+        assert_eq!(resolved.timeout_seconds, 15);
     }
 }

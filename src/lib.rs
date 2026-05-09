@@ -1,0 +1,219 @@
+pub mod cli;
+pub mod config;
+pub mod generator;
+
+use std::{
+    ffi::OsString,
+    fs,
+    path::{Path, PathBuf},
+};
+
+use anyhow::{Context, Result, bail};
+use clap::Parser;
+use cli::{Cli, Commands, GenerateArgs, InstallLinksArgs};
+use config::{ConfigOverrides, TeaqlConfig, config_file_path};
+
+pub fn run_from_env() -> Result<()> {
+    let args: Vec<OsString> = std::env::args_os().collect();
+    run_with_args(args)
+}
+
+pub fn run_with_args<I, T>(args: I) -> Result<()>
+where
+    I: IntoIterator<Item = T>,
+    T: Into<OsString>,
+{
+    let args: Vec<OsString> = args.into_iter().map(Into::into).collect();
+    let argv = rewrite_args_for_alias(args);
+    run_cli(Cli::parse_from(argv))
+}
+
+pub fn run_cli(cli: Cli) -> Result<()> {
+    match cli.command {
+        Commands::Config => {
+            let config_path = config_file_path()?;
+            let existing = TeaqlConfig::load()?;
+            let updated = config::run_wizard(existing)?;
+            updated.save(&config_path)?;
+            println!("saved config to {}", config_path.display());
+        }
+        Commands::ShowConfig => {
+            let config_path = config_file_path()?;
+            let config = TeaqlConfig::load()?;
+            println!("config_path: {}", config_path.display());
+            println!("{}", serde_yaml::to_string(&config)?);
+        }
+        Commands::InstallLinks(args) => install_links(args)?,
+        Commands::GenCode(args) => run_generate(args, None, cli.cwd)?,
+        Commands::GenDoc(args) => run_generate(args, Some("doc"), cli.cwd)?,
+        Commands::GenModel(args) => run_generate(args, Some("frontend"), cli.cwd)?,
+    }
+
+    Ok(())
+}
+
+fn run_generate(args: GenerateArgs, scope: Option<&str>, cwd: PathBuf) -> Result<()> {
+    let config = TeaqlConfig::load()?;
+    let overrides = ConfigOverrides {
+        service_url: args.service_url,
+        license_file: args.license_file,
+        build_dir: args.output,
+        timeout_seconds: args.timeout_seconds,
+    };
+    let resolved = config.resolve(overrides, &cwd);
+    generator::generate(&args.input, scope, &resolved)
+}
+
+fn rewrite_args_for_alias(mut args: Vec<OsString>) -> Vec<OsString> {
+    if let Some(program_name) = args
+        .first()
+        .and_then(|arg| Path::new(arg).file_name())
+        .and_then(|name| name.to_str())
+    {
+        if let Some(subcommand) = alias_subcommand(program_name) {
+            args[0] = OsString::from("teaql");
+            args.insert(1, OsString::from(subcommand));
+        }
+    }
+    args
+}
+
+fn alias_subcommand(program_name: &str) -> Option<&'static str> {
+    match program_name {
+        "cargo-teaql-gen-code" => Some("gen-code"),
+        "cargo-teaql-gen-doc" => Some("gen-doc"),
+        "cargo-teaql-gen-model" => Some("gen-model"),
+        "cargo-teaql-show-config" => Some("show-config"),
+        "cargo-teaql-config" => Some("config"),
+        _ => None,
+    }
+}
+
+fn install_links(args: InstallLinksArgs) -> Result<()> {
+    #[cfg(not(unix))]
+    {
+        let _ = args;
+        bail!("install-links currently supports Unix-style symlinks only");
+    }
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::symlink;
+
+        let current_exe = std::env::current_exe().context("failed to locate current executable")?;
+        let target = fs::canonicalize(&current_exe)
+            .with_context(|| format!("failed to resolve {}", current_exe.display()))?;
+        let install_dir = match args.dir {
+            Some(dir) => dir,
+            None => current_exe
+                .parent()
+                .context("current executable has no parent directory")?
+                .to_path_buf(),
+        };
+
+        fs::create_dir_all(&install_dir)
+            .with_context(|| format!("failed to create {}", install_dir.display()))?;
+
+        for alias in link_names() {
+            let link_path = install_dir.join(alias);
+            if link_path.exists() || symlink_metadata_exists(&link_path) {
+                if points_to_target(&link_path, &target)? {
+                    println!("exists {}", link_path.display());
+                    continue;
+                }
+
+                if !args.force {
+                    bail!(
+                        "refusing to overwrite existing path without --force: {}",
+                        link_path.display()
+                    );
+                }
+
+                fs::remove_file(&link_path)
+                    .with_context(|| format!("failed to remove {}", link_path.display()))?;
+            }
+
+            symlink(&target, &link_path).with_context(|| {
+                format!(
+                    "failed to create symlink {} -> {}",
+                    link_path.display(),
+                    target.display()
+                )
+            })?;
+            println!("linked {} -> {}", link_path.display(), target.display());
+        }
+    }
+
+    Ok(())
+}
+
+fn link_names() -> &'static [&'static str] {
+    &[
+        "teaql",
+        "cargo-teaql-gen-code",
+        "cargo-teaql-gen-doc",
+        "cargo-teaql-gen-model",
+        "cargo-teaql-show-config",
+        "cargo-teaql-config",
+    ]
+}
+
+fn symlink_metadata_exists(path: &Path) -> bool {
+    fs::symlink_metadata(path).is_ok()
+}
+
+fn points_to_target(link_path: &Path, target: &Path) -> Result<bool> {
+    let metadata = match fs::symlink_metadata(link_path) {
+        Ok(metadata) => metadata,
+        Err(_) => return Ok(false),
+    };
+    if !metadata.file_type().is_symlink() {
+        return Ok(false);
+    }
+
+    let linked = fs::canonicalize(link_path)
+        .with_context(|| format!("failed to resolve {}", link_path.display()))?;
+    Ok(linked == target)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rewrites_alias_binary_name_to_subcommand() {
+        let args = vec![
+            OsString::from("/tmp/bin/cargo-teaql-gen-code"),
+            OsString::from("model.yml"),
+            OsString::from("--cwd"),
+            OsString::from("/workspace"),
+        ];
+
+        let rewritten = rewrite_args_for_alias(args);
+
+        assert_eq!(rewritten[0], OsString::from("teaql"));
+        assert_eq!(rewritten[1], OsString::from("gen-code"));
+        assert_eq!(rewritten[2], OsString::from("model.yml"));
+        assert_eq!(rewritten[3], OsString::from("--cwd"));
+        assert_eq!(rewritten[4], OsString::from("/workspace"));
+    }
+
+    #[test]
+    fn leaves_primary_binary_name_unchanged() {
+        let args = vec![OsString::from("cargo-teaql"), OsString::from("show-config")];
+
+        let rewritten = rewrite_args_for_alias(args.clone());
+
+        assert_eq!(rewritten, args);
+    }
+
+    #[test]
+    fn link_names_cover_all_aliases() {
+        assert!(link_names().contains(&"teaql"));
+        assert!(link_names().contains(&"cargo-teaql-gen-code"));
+        assert!(link_names().contains(&"cargo-teaql-gen-doc"));
+        assert!(link_names().contains(&"cargo-teaql-gen-model"));
+        assert!(link_names().contains(&"cargo-teaql-show-config"));
+        assert!(link_names().contains(&"cargo-teaql-config"));
+    }
+}

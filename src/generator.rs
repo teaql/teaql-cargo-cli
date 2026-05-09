@@ -178,3 +178,77 @@ fn zip_directory(directory: &Path, writer: &mut File) -> Result<()> {
     zip.finish()?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn prepare_upload_returns_original_file_for_file_input() {
+        let temp = tempdir().unwrap();
+        let input = temp.path().join("model.yml");
+        fs::write(&input, "name: demo").unwrap();
+
+        let upload = prepare_upload(&input).unwrap();
+
+        assert_eq!(upload, input);
+    }
+
+    #[test]
+    fn prepare_upload_zips_directory_contents() {
+        let temp = tempdir().unwrap();
+        let input_dir = temp.path().join("model");
+        fs::create_dir_all(input_dir.join("nested")).unwrap();
+        fs::write(input_dir.join("root.txt"), "root").unwrap();
+        fs::write(input_dir.join("nested").join("child.txt"), "child").unwrap();
+
+        let upload = prepare_upload(&input_dir).unwrap();
+        let zip_bytes = fs::read(upload).unwrap();
+        let mut archive = ZipArchive::new(Cursor::new(zip_bytes)).unwrap();
+
+        let mut root = archive.by_name("root.txt").unwrap();
+        let mut root_content = String::new();
+        root.read_to_string(&mut root_content).unwrap();
+        drop(root);
+
+        let mut child = archive.by_name("nested/child.txt").unwrap();
+        let mut child_content = String::new();
+        child.read_to_string(&mut child_content).unwrap();
+
+        assert_eq!(root_content, "root");
+        assert_eq!(child_content, "child");
+    }
+
+    #[test]
+    fn extract_zip_writes_files_to_output_directory() {
+        let temp = tempdir().unwrap();
+        let zip_path = temp.path().join("archive.zip");
+        let mut file = File::create(&zip_path).unwrap();
+        zip_directory(create_fixture_tree(temp.path()).as_path(), &mut file).unwrap();
+        drop(file);
+
+        let output_dir = temp.path().join("out");
+        let zip_bytes = fs::read(zip_path).unwrap();
+        extract_zip(&zip_bytes, &output_dir).unwrap();
+
+        assert_eq!(
+            fs::read_to_string(output_dir.join("root.txt")).unwrap(),
+            "root"
+        );
+        assert_eq!(
+            fs::read_to_string(output_dir.join("nested").join("child.txt")).unwrap(),
+            "child"
+        );
+    }
+
+    fn create_fixture_tree(base: &Path) -> PathBuf {
+        let fixture = base.join("fixture");
+        fs::create_dir_all(fixture.join("nested")).unwrap();
+        fs::write(fixture.join("root.txt"), "root").unwrap();
+        fs::write(fixture.join("nested").join("child.txt"), "child").unwrap();
+        fixture
+    }
+}
