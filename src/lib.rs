@@ -44,7 +44,7 @@ pub fn run_cli(cli: Cli) -> Result<()> {
             println!("{}", serde_yaml::to_string(&config)?);
         }
         Commands::InstallLinks(args) => install_links(args)?,
-        Commands::GenCode(args) => run_generate(args, None, cli.cwd)?,
+        Commands::GenCode(args) => run_generate(args, Some("rust-lib"), cli.cwd)?,
         Commands::GenDoc(args) => run_generate(args, Some("doc"), cli.cwd)?,
         Commands::GenModel(args) => run_generate(args, Some("frontend"), cli.cwd)?,
     }
