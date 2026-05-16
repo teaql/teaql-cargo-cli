@@ -36,6 +36,7 @@ pub fn generate(input: &Path, scope: Option<&str>, config: &ResolvedConfig) -> R
         .with_context(|| format!("failed to create {}", config.build_dir.display()))?;
 
     let upload_path = prepare_upload(input)?;
+    println!("model input: {}", input.display());
     let zip_bytes = request_generation(&upload_path, scope, config)?;
     let archive_path = config.build_dir.join("domain.zip");
     fs::write(&archive_path, &zip_bytes)
