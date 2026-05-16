@@ -1,1 +1,10 @@
-TeaQL public license placeholder.
+{
+    "maxFieldCount": 300,
+    "maxEntityCount": 30,
+    "name": "free account",
+    "Issued By": "teaql",
+    "Issued On": "2023-06-03 17:39:17",
+    "Expires On": "2050-10-18 17:39:17",
+    "PUBLIC KEY": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEpCA/P15AVMn70rNUdnaRyRu2ZOcVpMkdgyJZRSdJpH+MFwLtlw3DrzRf1m2b6D7vNKBiUKC/Og0epidq+oswhQ==",
+    "SIGNATURE": "MEUCIQC+rxza8mQtemB4kp9z9zFbhB/ixCdW21+y+X0dzM9nYAIgD1PaQkLpAeqM0RASK4Crgh+TBOSCwKHx3+WT5VG9VCk="
+}

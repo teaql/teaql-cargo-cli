@@ -7,6 +7,7 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 use reqwest::blocking::{Client, multipart};
+use serde_json::Value;
 use tempfile::NamedTempFile;
 use walkdir::WalkDir;
 use zip::{
@@ -25,6 +26,10 @@ pub fn generate(input: &Path, scope: Option<&str>, config: &ResolvedConfig) -> R
             "license file does not exist: {}",
             config.license_file.display()
         );
+    }
+
+    if config.is_default_license {
+        print_default_license_info(&config.license_file);
     }
 
     fs::create_dir_all(&config.build_dir)
@@ -177,6 +182,54 @@ fn zip_directory(directory: &Path, writer: &mut File) -> Result<()> {
 
     zip.finish()?;
     Ok(())
+}
+
+/// Fields intentionally hidden when printing the default license banner.
+const SUPPRESSED_LICENSE_FIELDS: &[&str] = &["PUBLIC KEY", "SIGNATURE"];
+
+/// Parse the bundled `public.LICENSE` JSON and print user-visible fields,
+/// followed by a fair-use notice.
+fn print_default_license_info(license_file: &Path) {
+    let content = match fs::read_to_string(license_file) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("warning: could not read default license file: {e}");
+            return;
+        }
+    };
+
+    let value: Value = match serde_json::from_str(&content) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("warning: could not parse default license: {e}");
+            return;
+        }
+    };
+
+    let obj = match value.as_object() {
+        Some(o) => o,
+        None => return,
+    };
+
+    println!();
+    println!("┌─────────────────────────────────────────────────┐");
+    println!("│              TeaQL License (default)            │");
+    println!("├─────────────────────────────────────────────────┤");
+    for (key, val) in obj {
+        if SUPPRESSED_LICENSE_FIELDS.contains(&key.as_str()) {
+            continue;
+        }
+        let display = val.as_str().map(|s| s.to_string()).unwrap_or_else(|| val.to_string());
+        println!("│  {:<18} : {:<27}│", key, display);
+    }
+    println!("├─────────────────────────────────────────────────┤");
+    println!("│  ⚠  Fair Use Notice                             │");
+    println!("│  You are using the public free-tier license.    │");
+    println!("│  Configure a personal license via:              │");
+    println!("│    ~/.teaql/config.yml  →  license_file: ...    │");
+    println!("│  or pass  --license-file <path>                 │");
+    println!("└─────────────────────────────────────────────────┘");
+    println!();
 }
 
 #[cfg(test)]

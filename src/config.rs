@@ -36,6 +36,8 @@ pub struct ConfigOverrides {
 pub struct ResolvedConfig {
     pub service_url: String,
     pub license_file: PathBuf,
+    /// `true` when no license was configured and the bundled `public.LICENSE` is used.
+    pub is_default_license: bool,
     pub build_dir: PathBuf,
     pub timeout_seconds: u64,
 }
@@ -88,6 +90,7 @@ impl TeaqlConfig {
         );
         let timeout_seconds = overrides.timeout_seconds.unwrap_or(self.timeout_seconds);
         let configured_license = overrides.license_file.or_else(|| self.license_file.clone());
+        let is_default_license = configured_license.is_none();
         let license_file = configured_license
             .map(|path| normalize_path(path, cwd))
             .unwrap_or_else(default_license_path);
@@ -95,6 +98,7 @@ impl TeaqlConfig {
         ResolvedConfig {
             service_url,
             license_file,
+            is_default_license,
             build_dir,
             timeout_seconds,
         }
