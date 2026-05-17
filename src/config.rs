@@ -8,7 +8,7 @@ use dialoguer::Input;
 use serde::{Deserialize, Serialize};
 
 const DEFAULT_SERVICE_URL: &str =
-    "http://springboot.teaql-gen-code.1496855407387739.cn-chengdu.fc.devsapp.net/generate";
+    "https://api.teaql.io/latest/";
 const DEFAULT_BUILD_DIR: &str = "build";
 const DEFAULT_TIMEOUT_SECONDS: u64 = 300;
 
