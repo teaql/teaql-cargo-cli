@@ -7,6 +7,57 @@ use anyhow::{Context, Result};
 use dialoguer::Input;
 use serde::{Deserialize, Serialize};
 
+/// Where a resolved config value came from (highest priority first).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConfigSource {
+    Cli,
+    Env,
+    ConfigFile,
+    Default,
+}
+
+impl ConfigSource {
+    pub fn label(self) -> &'static str {
+        match self {
+            ConfigSource::Cli => "cli flag",
+            ConfigSource::Env => "environment variable",
+            ConfigSource::ConfigFile => "~/.teaql/config.yml",
+            ConfigSource::Default => "built-in default",
+        }
+    }
+}
+
+/// Values read from environment variables.
+/// Each field is `Some` only if the corresponding env var is set.
+#[derive(Debug, Clone, Default)]
+pub struct EnvConfig {
+    pub service_url: Option<String>,
+    pub license_file: Option<PathBuf>,
+    pub build_dir: Option<PathBuf>,
+    pub timeout_seconds: Option<u64>,
+}
+
+impl EnvConfig {
+    pub fn from_env() -> Self {
+        Self {
+            service_url: env::var("TEAQL_SERVICE_URL").ok(),
+            license_file: env::var("TEAQL_LICENSE_FILE").ok().map(PathBuf::from),
+            build_dir: env::var("TEAQL_BUILD_DIR").ok().map(PathBuf::from),
+            timeout_seconds: env::var("TEAQL_TIMEOUT_SECONDS")
+                .ok()
+                .and_then(|v| v.parse().ok()),
+        }
+    }
+
+    /// Returns `true` if any env var was set.
+    pub fn is_empty(&self) -> bool {
+        self.service_url.is_none()
+            && self.license_file.is_none()
+            && self.build_dir.is_none()
+            && self.timeout_seconds.is_none()
+    }
+}
+
 const DEFAULT_SERVICE_URL: &str =
     "https://api.teaql.io/latest/";
 const DEFAULT_BUILD_DIR: &str = "build";
@@ -78,22 +129,74 @@ impl TeaqlConfig {
         Ok(())
     }
 
-    pub fn resolve(&self, overrides: ConfigOverrides, cwd: &Path) -> ResolvedConfig {
-        let service_url = overrides
-            .service_url
-            .unwrap_or_else(|| self.service_url.clone());
-        let build_dir = normalize_path(
-            overrides
-                .build_dir
-                .unwrap_or_else(|| self.build_dir.clone()),
-            cwd,
+    pub fn resolve(
+        &self,
+        overrides: ConfigOverrides,
+        env: &EnvConfig,
+        cwd: &Path,
+    ) -> ResolvedConfig {
+        // ── service_url: cli > env > config.yml > default ──
+        let (service_url, service_url_source) = if let Some(v) = overrides.service_url {
+            (v, ConfigSource::Cli)
+        } else if let Some(ref v) = env.service_url {
+            (v.clone(), ConfigSource::Env)
+        } else {
+            (self.service_url.clone(), ConfigSource::ConfigFile)
+        };
+
+        // ── license_file: cli > env > config.yml > default ──
+        let (license_file, is_default_license, license_source) = if let Some(p) = overrides.license_file {
+            (normalize_path(p, cwd), false, ConfigSource::Cli)
+        } else if let Some(ref p) = env.license_file {
+            (normalize_path(p.clone(), cwd), false, ConfigSource::Env)
+        } else if let Some(ref p) = self.license_file {
+            (normalize_path(p.clone(), cwd), false, ConfigSource::ConfigFile)
+        } else {
+            (default_license_path(), true, ConfigSource::Default)
+        };
+
+        // ── build_dir: cli > env > config.yml > default ──
+        let (build_dir, build_dir_source) = if let Some(p) = overrides.build_dir {
+            (normalize_path(p, cwd), ConfigSource::Cli)
+        } else if let Some(ref p) = env.build_dir {
+            (normalize_path(p.clone(), cwd), ConfigSource::Env)
+        } else {
+            (normalize_path(self.build_dir.clone(), cwd), ConfigSource::ConfigFile)
+        };
+
+        // ── timeout_seconds: cli > env > config.yml > default ──
+        let (timeout_seconds, timeout_source) = if let Some(v) = overrides.timeout_seconds {
+            (v, ConfigSource::Cli)
+        } else if let Some(v) = env.timeout_seconds {
+            (v, ConfigSource::Env)
+        } else {
+            (self.timeout_seconds, ConfigSource::ConfigFile)
+        };
+
+        // ── print sources ──
+        println!();
+        println!("  config (precedence: cli > env > config.yml > default):");
+        println!(
+            "    service_url    = {}  (from: {})",
+            service_url,
+            service_url_source.label(),
         );
-        let timeout_seconds = overrides.timeout_seconds.unwrap_or(self.timeout_seconds);
-        let configured_license = overrides.license_file.or_else(|| self.license_file.clone());
-        let is_default_license = configured_license.is_none();
-        let license_file = configured_license
-            .map(|path| normalize_path(path, cwd))
-            .unwrap_or_else(default_license_path);
+        println!(
+            "    license_file  = {}  (from: {})",
+            license_file.display(),
+            license_source.label(),
+        );
+        println!(
+            "    build_dir     = {}  (from: {})",
+            build_dir.display(),
+            build_dir_source.label(),
+        );
+        println!(
+            "    timeout_seconds = {}  (from: {})",
+            timeout_seconds,
+            timeout_source.label(),
+        );
+        println!();
 
         ResolvedConfig {
             service_url,
@@ -201,6 +304,7 @@ mod tests {
                 build_dir: None,
                 timeout_seconds: None,
             },
+            &EnvConfig::default(),
             cwd,
         );
 
@@ -225,6 +329,7 @@ mod tests {
                 build_dir: Some(PathBuf::from("custom-build")),
                 timeout_seconds: Some(15),
             },
+            &EnvConfig::default(),
             cwd,
         );
 
@@ -235,5 +340,62 @@ mod tests {
             PathBuf::from("/workspace/project/custom-build")
         );
         assert_eq!(resolved.timeout_seconds, 15);
+    }
+
+    #[test]
+    fn resolve_env_overrides_config_file() {
+        let cwd = Path::new("/workspace/project");
+        let config = TeaqlConfig {
+            service_url: "https://config.file/generate".to_string(),
+            license_file: None,
+            build_dir: PathBuf::from("build"),
+            timeout_seconds: 300,
+        };
+
+        let env = EnvConfig {
+            service_url: Some("https://env.var/generate".to_string()),
+            license_file: None,
+            build_dir: None,
+            timeout_seconds: None,
+        };
+
+        let resolved = config.resolve(
+            ConfigOverrides {
+                service_url: None,
+                license_file: None,
+                build_dir: None,
+                timeout_seconds: None,
+            },
+            &env,
+            cwd,
+        );
+
+        assert_eq!(resolved.service_url, "https://env.var/generate");
+        assert_eq!(resolved.build_dir, PathBuf::from("/workspace/project/build"));
+    }
+
+    #[test]
+    fn resolve_cli_overrides_env() {
+        let cwd = Path::new("/workspace/project");
+        let config = TeaqlConfig::default();
+        let env = EnvConfig {
+            service_url: Some("https://env.var/generate".to_string()),
+            license_file: None,
+            build_dir: None,
+            timeout_seconds: None,
+        };
+
+        let resolved = config.resolve(
+            ConfigOverrides {
+                service_url: Some("https://cli.flag/generate".to_string()),
+                license_file: None,
+                build_dir: None,
+                timeout_seconds: None,
+            },
+            &env,
+            cwd,
+        );
+
+        assert_eq!(resolved.service_url, "https://cli.flag/generate");
     }
 }

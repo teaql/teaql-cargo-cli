@@ -11,7 +11,7 @@ use std::{
 use anyhow::{Context, Result, bail};
 use clap::Parser;
 use cli::{Cli, Commands, GenerateArgs, InstallLinksArgs};
-use config::{ConfigOverrides, TeaqlConfig, config_file_path};
+use config::{ConfigOverrides, EnvConfig, TeaqlConfig, config_file_path};
 
 pub fn run_from_env() -> Result<()> {
     let args: Vec<OsString> = std::env::args_os().collect();
@@ -54,13 +54,14 @@ pub fn run_cli(cli: Cli) -> Result<()> {
 
 fn run_generate(args: GenerateArgs, scope: Option<&str>, cwd: PathBuf) -> Result<()> {
     let config = TeaqlConfig::load()?;
+    let env = EnvConfig::from_env();
     let overrides = ConfigOverrides {
         service_url: args.service_url,
         license_file: args.license_file,
         build_dir: args.output,
         timeout_seconds: args.timeout_seconds,
     };
-    let resolved = config.resolve(overrides, &cwd);
+    let resolved = config.resolve(overrides, &env, &cwd);
     generator::generate(&args.input, scope, &resolved)
 }
 
