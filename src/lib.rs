@@ -1,6 +1,7 @@
 pub mod cli;
 pub mod config;
 pub mod generator;
+pub mod service;
 
 use std::{
     ffi::OsString,
@@ -10,7 +11,7 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 use clap::Parser;
-use cli::{Cli, Commands, GenerateArgs, InstallLinksArgs};
+use cli::{Cli, Commands, GenerateArgs, InstallLinksArgs, ServiceArgs};
 use config::{ConfigOverrides, EnvConfig, TeaqlConfig, config_file_path};
 
 pub fn run_from_env() -> Result<()> {
@@ -47,6 +48,7 @@ pub fn run_cli(cli: Cli) -> Result<()> {
         Commands::GenCode(args) => run_generate(args, Some("rust-lib"), cli.cwd)?,
         Commands::GenDoc(args) => run_generate(args, Some("doc"), cli.cwd)?,
         Commands::GenModel(args) => run_generate(args, Some("frontend"), cli.cwd)?,
+        Commands::Version(args) => run_version(args, cli.cwd)?,
     }
 
     Ok(())
@@ -56,6 +58,7 @@ fn run_generate(args: GenerateArgs, scope: Option<&str>, cwd: PathBuf) -> Result
     let config = TeaqlConfig::load()?;
     let env = EnvConfig::from_env();
     let overrides = ConfigOverrides {
+        endpoint_prefix: args.endpoint_prefix,
         service_url: args.service_url,
         license_file: args.license_file,
         build_dir: args.output,
@@ -63,6 +66,20 @@ fn run_generate(args: GenerateArgs, scope: Option<&str>, cwd: PathBuf) -> Result
     };
     let resolved = config.resolve(overrides, &env, &cwd);
     generator::generate(&args.input, scope, &resolved)
+}
+
+fn run_version(args: ServiceArgs, cwd: PathBuf) -> Result<()> {
+    let config = TeaqlConfig::load()?;
+    let env = EnvConfig::from_env();
+    let overrides = ConfigOverrides {
+        endpoint_prefix: args.endpoint_prefix,
+        service_url: args.service_url,
+        license_file: None,
+        build_dir: None,
+        timeout_seconds: args.timeout_seconds,
+    };
+    let resolved = config.resolve(overrides, &env, &cwd);
+    service::print_version(&resolved)
 }
 
 fn rewrite_args_for_alias(mut args: Vec<OsString>) -> Vec<OsString> {
@@ -84,6 +101,7 @@ fn alias_subcommand(program_name: &str) -> Option<&'static str> {
         "cargo-teaql-gen-code" => Some("gen-code"),
         "cargo-teaql-gen-doc" => Some("gen-doc"),
         "cargo-teaql-gen-model" => Some("gen-model"),
+        "cargo-teaql-version" => Some("version"),
         "cargo-teaql-show-config" => Some("show-config"),
         "cargo-teaql-config" => Some("config"),
         _ => None,
@@ -154,6 +172,7 @@ fn link_names() -> &'static [&'static str] {
         "cargo-teaql-gen-code",
         "cargo-teaql-gen-doc",
         "cargo-teaql-gen-model",
+        "cargo-teaql-version",
         "cargo-teaql-show-config",
         "cargo-teaql-config",
     ]
@@ -214,6 +233,7 @@ mod tests {
         assert!(link_names().contains(&"cargo-teaql-gen-code"));
         assert!(link_names().contains(&"cargo-teaql-gen-doc"));
         assert!(link_names().contains(&"cargo-teaql-gen-model"));
+        assert!(link_names().contains(&"cargo-teaql-version"));
         assert!(link_names().contains(&"cargo-teaql-show-config"));
         assert!(link_names().contains(&"cargo-teaql-config"));
     }

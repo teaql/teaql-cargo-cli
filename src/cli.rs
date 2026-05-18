@@ -20,6 +20,8 @@ pub enum Commands {
     GenDoc(GenerateArgs),
     /// Generate model/frontend output.
     GenModel(GenerateArgs),
+    /// Show TeaQL service version information.
+    Version(ServiceArgs),
     /// Show effective local config.
     ShowConfig,
     /// Configure TeaQL in the current workspace.
@@ -33,7 +35,11 @@ pub struct GenerateArgs {
     /// Model file or directory to upload.
     pub input: PathBuf,
 
-    /// Override service URL.
+    /// Override TeaQL endpoint prefix, for example https://api.teaql.io/latest/.
+    #[arg(long)]
+    pub endpoint_prefix: Option<String>,
+
+    /// Override TeaQL service URL. Deprecated: use --endpoint-prefix.
     #[arg(long)]
     pub service_url: Option<String>,
 
@@ -44,6 +50,21 @@ pub struct GenerateArgs {
     /// Override output directory.
     #[arg(long)]
     pub output: Option<PathBuf>,
+
+    /// Override request timeout in seconds.
+    #[arg(long)]
+    pub timeout_seconds: Option<u64>,
+}
+
+#[derive(Debug, Args)]
+pub struct ServiceArgs {
+    /// Override TeaQL endpoint prefix, for example https://api.teaql.io/latest/.
+    #[arg(long)]
+    pub endpoint_prefix: Option<String>,
+
+    /// Override TeaQL service URL. Deprecated: use --endpoint-prefix.
+    #[arg(long)]
+    pub service_url: Option<String>,
 
     /// Override request timeout in seconds.
     #[arg(long)]

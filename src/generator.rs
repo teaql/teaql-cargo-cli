@@ -15,7 +15,7 @@ use zip::{
     write::{ExtendedFileOptions, FileOptions},
 };
 
-use crate::config::ResolvedConfig;
+use crate::{config::ResolvedConfig, service::endpoint_url};
 
 pub fn generate(input: &Path, scope: Option<&str>, config: &ResolvedConfig) -> Result<()> {
     if !input.exists() {
@@ -108,14 +108,15 @@ fn request_generation(
         form = form.text("scope", scope.to_string());
     }
 
-    println!("using {}", config.service_url);
+    let request_url = endpoint_url(&config.endpoint_prefix, "generate");
+    println!("using {}", request_url);
     let response = client
-        .post(&config.service_url)
+        .post(&request_url)
         .multipart(form)
         .send()
-        .with_context(|| format!("request failed: {}", config.service_url))?
+        .with_context(|| format!("request failed: {}", request_url))?
         .error_for_status()
-        .with_context(|| format!("service returned error: {}", config.service_url))?;
+        .with_context(|| format!("service returned error: {}", request_url))?;
 
     Ok(response.bytes()?.to_vec())
 }
@@ -220,7 +221,10 @@ fn print_default_license_info(license_file: &Path) {
         if SUPPRESSED_LICENSE_FIELDS.contains(&key.as_str()) {
             continue;
         }
-        let display = val.as_str().map(|s| s.to_string()).unwrap_or_else(|| val.to_string());
+        let display = val
+            .as_str()
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| val.to_string());
         println!("│  {:<18} : {:<27}│", key, display);
     }
     println!("├─────────────────────────────────────────────────┤");

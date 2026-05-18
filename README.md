@@ -8,6 +8,7 @@ Rust CLI for TeaQL code generation workflows.
 cargo-teaql gen-code <model-path>
 cargo-teaql gen-doc <model-path>
 cargo-teaql gen-model <model-path>
+cargo-teaql version
 cargo-teaql show-config
 cargo-teaql config
 cargo-teaql install-links
@@ -17,7 +18,7 @@ cargo-teaql install-links
 
 ```bash
 cargo-teaql gen-code <model-path> \
-  --service-url https://api.teaql.io/latest/ \
+  --endpoint-prefix https://api.teaql.io/latest/ \
   --license-file /path/to/license \
   --output ./build \
   --timeout-seconds 300 \
@@ -32,6 +33,7 @@ If you create symlink aliases to the same binary, these names also work:
 cargo teaql-gen-code <model-path>
 cargo teaql-gen-doc <model-path>
 cargo teaql-gen-model <model-path>
+cargo teaql-version
 cargo teaql-show-config
 cargo teaql-config
 ```
@@ -49,6 +51,7 @@ teaql
 cargo-teaql-gen-code
 cargo-teaql-gen-doc
 cargo-teaql-gen-model
+cargo-teaql-version
 cargo-teaql-show-config
 cargo-teaql-config
 ```
@@ -69,21 +72,28 @@ CLI flag  >  Environment variable  >  config.yml  >  Built-in default
 
 | Env var | Config key | Description |
 |---|---|---|
-| `TEAQL_SERVICE_URL` | `service_url` | Service endpoint URL |
+| `TEAQL_ENDPOINT_PREFIX` | `endpoint_prefix` | TeaQL service endpoint prefix |
 | `TEAQL_LICENSE_FILE` | `license_file` | License file path |
 | `TEAQL_BUILD_DIR` | `build_dir` | Output directory |
 | `TEAQL_TIMEOUT_SECONDS` | `timeout_seconds` | HTTP timeout in seconds |
+
+`TEAQL_SERVICE_URL` is still accepted for compatibility, but new
+configuration should use `TEAQL_ENDPOINT_PREFIX`.
 
 ### Config file
 
 Local config lives in `~/.teaql/config.yml`.
 
 ```yaml
-service_url: https://api.teaql.io/latest/
+endpoint_prefix: https://api.teaql.io/latest/
 license_file: /path/to/your.LICENSE   # optional — bundled public.LICENSE used if omitted
 build_dir: build
 timeout_seconds: 300
 ```
+
+The endpoint prefix is combined with service methods. For example, generation
+uses `https://api.teaql.io/latest/generate`, and `cargo-teaql version` uses
+`https://api.teaql.io/latest/version`.
 
 ### Source tracking
 
@@ -91,7 +101,7 @@ At startup, the CLI prints where each effective config value came from:
 
 ```
   config (precedence: cli > env > config.yml > default):
-    service_url     = https://api.teaql.io/latest/  (from: environment variable)
+    endpoint_prefix = https://api.teaql.io/latest/          (from: environment variable)
     license_file    = /home/user/.teaql/license       (from: ~/.teaql/config.yml)
     build_dir       = /workspace/build                (from: built-in default)
     timeout_seconds = 300                             (from: ~/.teaql/config.yml)
