@@ -1,7 +1,12 @@
 [package]
 name = "cargo-teaql"
-version = "0.1.0"
+version = "0.1.2"
 edition = "2024"
+description = "Rust CLI for TeaQL service code generation workflows"
+license = "MIT"
+repository = "https://github.com/teaql/teaql-cargo-cli"
+homepage = "https://github.com/teaql/teaql-cargo-cli"
+readme = "README.md"
 
 [[bin]]
 name = "cargo-teaql"
