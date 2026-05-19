@@ -49,6 +49,7 @@ pub fn run_cli(cli: Cli) -> Result<()> {
         Commands::GenDoc(args) => run_generate(args, Some("doc"), cli.cwd)?,
         Commands::GenModel(args) => run_generate(args, Some("frontend"), cli.cwd)?,
         Commands::Version(args) => run_version(args, cli.cwd)?,
+        Commands::Ping(args) => run_ping(args, cli.cwd)?,
     }
 
     Ok(())
@@ -82,6 +83,20 @@ fn run_version(args: ServiceArgs, cwd: PathBuf) -> Result<()> {
     service::print_version(&resolved)
 }
 
+fn run_ping(args: ServiceArgs, cwd: PathBuf) -> Result<()> {
+    let config = TeaqlConfig::load()?;
+    let env = EnvConfig::from_env();
+    let overrides = ConfigOverrides {
+        endpoint_prefix: args.endpoint_prefix,
+        service_url: args.service_url,
+        license_file: args.license_file,
+        build_dir: Some(std::env::temp_dir().join("teaql-ping")),
+        timeout_seconds: args.timeout_seconds,
+    };
+    let resolved = config.resolve(overrides, &env, &cwd);
+    service::ping(&resolved)
+}
+
 fn rewrite_args_for_alias(mut args: Vec<OsString>) -> Vec<OsString> {
     if let Some(program_name) = args
         .first()
@@ -102,6 +117,7 @@ fn alias_subcommand(program_name: &str) -> Option<&'static str> {
         "cargo-teaql-gen-doc" => Some("gen-doc"),
         "cargo-teaql-gen-model" => Some("gen-model"),
         "cargo-teaql-version" => Some("version"),
+        "cargo-teaql-ping" => Some("ping"),
         "cargo-teaql-show-config" => Some("show-config"),
         "cargo-teaql-config" => Some("config"),
         _ => None,
@@ -174,6 +190,7 @@ fn link_names() -> &'static [&'static str] {
         "cargo-teaql-gen-model",
         "cargo-teaql-version",
         "cargo-teaql-show-config",
+        "cargo-teaql-ping",
         "cargo-teaql-config",
     ]
 }
@@ -235,6 +252,7 @@ mod tests {
         assert!(link_names().contains(&"cargo-teaql-gen-model"));
         assert!(link_names().contains(&"cargo-teaql-version"));
         assert!(link_names().contains(&"cargo-teaql-show-config"));
+        assert!(link_names().contains(&"cargo-teaql-ping"));
         assert!(link_names().contains(&"cargo-teaql-config"));
     }
 }

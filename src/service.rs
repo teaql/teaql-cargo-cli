@@ -1,10 +1,13 @@
-use std::{collections::BTreeMap, time::Duration};
+use std::{collections::BTreeMap, io::Write, time::{Duration, Instant}};
 
 use anyhow::{Context, Result};
-use reqwest::blocking::Client;
+use reqwest::blocking::{Client, multipart};
 use serde_json::Value;
 
 use crate::config::ResolvedConfig;
+
+/// The built-in demo model XML bundled with the crate.
+pub const DEMO_MODEL_XML: &str = include_str!("../assets/demo-service.xml");
 
 pub fn endpoint_url(endpoint_prefix: &str, method: &str) -> String {
     format!(
@@ -106,6 +109,205 @@ fn display_json_value(value: &Value) -> String {
         _ => value.to_string(),
     }
 }
+
+// ── ping ─────────────────────────────────────────────────────────────────────
+
+/// Run a full end-to-end smoke-test against the TeaQL service using the
+/// built-in demo model.  Prints detailed step-by-step diagnostics.
+pub fn ping(config: &ResolvedConfig) -> Result<()> {
+    let total_start = Instant::now();
+    let endpoint = endpoint_url(&config.endpoint_prefix, "generate");
+
+    step(1, "Configuration");
+    println!("    endpoint_prefix : {}", config.endpoint_prefix);
+    println!("    generate url    : {}", endpoint);
+    println!("    timeout         : {}s", config.timeout_seconds);
+    println!("    license_file    : {}", config.license_file.display());
+    println!("    build_dir       : {}", config.build_dir.display());
+
+    // ── step 2: write demo model to a temp file ──────────────────────────────
+    step(2, "Writing built-in demo model to temp file");
+    let t = Instant::now();
+    let mut model_tmp = tempfile::Builder::new()
+        .prefix("teaql-ping-model-")
+        .suffix(".xml")
+        .tempfile()
+        .context("failed to create temp file for demo model")?;
+    model_tmp
+        .write_all(DEMO_MODEL_XML.as_bytes())
+        .context("failed to write demo model")?;
+    model_tmp.flush().context("failed to flush demo model")?;
+    let model_path = model_tmp.path().to_path_buf();
+    println!("    written to      : {}", model_path.display());
+    println!("    size            : {} bytes", DEMO_MODEL_XML.len());
+    println!("    elapsed         : {:.0}ms", t.elapsed().as_secs_f64() * 1000.0);
+
+    // ── step 3: resolve license ───────────────────────────────────────────────
+    step(3, "Resolving license file");
+    let t = Instant::now();
+    let license_path = &config.license_file;
+    let license_exists = license_path.exists();
+    println!("    license_file    : {}", license_path.display());
+    println!("    exists on disk  : {}", license_exists);
+    if !license_exists {
+        println!("    → will use bundled public.LICENSE from crate assets");
+    }
+    println!("    elapsed         : {:.0}ms", t.elapsed().as_secs_f64() * 1000.0);
+
+    // ── step 4: build HTTP client ─────────────────────────────────────────────
+    step(4, "Building HTTP client");
+    let t = Instant::now();
+    let client = Client::builder()
+        .timeout(Duration::from_secs(config.timeout_seconds))
+        .build()
+        .context("failed to build HTTP client")?;
+    println!("    timeout         : {}s", config.timeout_seconds);
+    println!("    elapsed         : {:.0}ms", t.elapsed().as_secs_f64() * 1000.0);
+
+    // ── step 5: prepare license bytes ────────────────────────────────────────
+    step(5, "Reading license bytes");
+    let t = Instant::now();
+    let license_bytes = if license_exists {
+        std::fs::read(license_path)
+            .with_context(|| format!("failed to read license: {}", license_path.display()))?
+    } else {
+        // Use bundled public.LICENSE
+        let bundled = include_bytes!("../assets/public.LICENSE");
+        bundled.to_vec()
+    };
+    println!("    size            : {} bytes", license_bytes.len());
+    println!("    elapsed         : {:.0}ms", t.elapsed().as_secs_f64() * 1000.0);
+
+    // ── step 6: POST to service ───────────────────────────────────────────────
+    step(6, "Sending request to TeaQL service");
+    println!("    POST            : {}", endpoint);
+    println!("    scope           : rust-lib");
+    let t = Instant::now();
+
+    let model_bytes = DEMO_MODEL_XML.as_bytes().to_vec();
+    let file_part = multipart::Part::bytes(model_bytes).file_name("demo-service.xml");
+    let license_part = multipart::Part::bytes(license_bytes).file_name("public.LICENSE");
+    let form = multipart::Form::new()
+        .part("file", file_part)
+        .part("licenseFile", license_part)
+        .text("scope", "rust-lib");
+
+    let response = client
+        .post(&endpoint)
+        .multipart(form)
+        .send()
+        .with_context(|| format!("network request failed: {}", endpoint));
+
+    let elapsed_send = t.elapsed();
+    println!("    elapsed         : {:.0}ms", elapsed_send.as_secs_f64() * 1000.0);
+
+    let response = match response {
+        Ok(r) => r,
+        Err(e) => {
+            println!();
+            println!("  ✗  PING FAILED — network error");
+            println!("     {}", e);
+            println!("     total elapsed: {:.0}ms", total_start.elapsed().as_secs_f64() * 1000.0);
+            return Err(e);
+        }
+    };
+
+    let status = response.status();
+    println!("    HTTP status     : {}", status);
+
+    // ── step 7: read response ─────────────────────────────────────────────────
+    step(7, "Reading response body");
+    let t = Instant::now();
+    let body = response
+        .bytes()
+        .with_context(|| "failed to read response body")?;
+    println!("    body size       : {} bytes", body.len());
+    println!("    elapsed         : {:.0}ms", t.elapsed().as_secs_f64() * 1000.0);
+
+    if !status.is_success() {
+        let text = String::from_utf8_lossy(&body);
+        println!();
+        println!("  ✗  PING FAILED — service returned HTTP {}", status);
+        println!("     {}", text.lines().next().unwrap_or("(empty body)"));
+        println!("     total elapsed: {:.0}ms", total_start.elapsed().as_secs_f64() * 1000.0);
+        anyhow::bail!("service returned HTTP {}", status);
+    }
+
+    // ── step 8: inspect zip ───────────────────────────────────────────────────
+    step(8, "Inspecting generated zip archive");
+    let t = Instant::now();
+    let cursor = std::io::Cursor::new(&body);
+    let mut archive = zip::ZipArchive::new(cursor)
+        .context("response is not a valid zip archive")?;
+
+    let mut file_list: Vec<String> = Vec::new();
+    let mut has_error = false;
+    let mut error_content = String::new();
+
+    for i in 0..archive.len() {
+        let mut entry = archive.by_index(i)?;
+        let name = entry.name().to_string();
+        if name == "error.txt" {
+            has_error = true;
+            use std::io::Read;
+            entry.read_to_string(&mut error_content)?;
+        } else {
+            file_list.push(format!("    {:>8} bytes  {}", entry.size(), name));
+        }
+    }
+
+    println!("    files in archive: {}", file_list.len());
+    for f in &file_list {
+        println!("{}", f);
+    }
+    println!("    elapsed         : {:.0}ms", t.elapsed().as_secs_f64() * 1000.0);
+
+    // ── step 9: final result ──────────────────────────────────────────────────
+    step(9, "Result");
+    let total_ms = total_start.elapsed().as_secs_f64() * 1000.0;
+
+    if has_error {
+        println!();
+        println!("  ✗  PING FAILED — service returned error.txt");
+        println!();
+        for line in error_content.trim().lines() {
+            println!("     {}", line);
+        }
+        println!();
+        println!("     total elapsed: {:.0}ms", total_ms);
+        anyhow::bail!("service error: {}", error_content.trim());
+    }
+
+    println!();
+    println!("  ✓  PING OK");
+    println!("     endpoint      : {}", endpoint);
+    println!("     files         : {}", file_list.len());
+    println!("     total elapsed : {:.0}ms", total_ms);
+    println!();
+
+    Ok(())
+}
+
+fn step(n: u32, label: &str) {
+    println!();
+    println!("  [{}] {} — {}", n, label, chrono_now());
+}
+
+fn chrono_now() -> String {
+    // Use SystemTime for a simple timestamp without the chrono dep
+    use std::time::SystemTime;
+    let secs = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    // Format as HH:MM:SS UTC
+    let h = (secs / 3600) % 24;
+    let m = (secs / 60) % 60;
+    let s = secs % 60;
+    format!("{:02}:{:02}:{:02} UTC", h, m, s)
+}
+
+
 
 #[cfg(test)]
 mod tests {

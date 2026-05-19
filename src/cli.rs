@@ -20,6 +20,8 @@ pub enum Commands {
     GenDoc(GenerateArgs),
     /// Generate model/frontend output.
     GenModel(GenerateArgs),
+    /// Ping the TeaQL service: runs a built-in demo model and prints detailed diagnostics.
+    Ping(ServiceArgs),
     /// Show TeaQL service version information.
     Version(ServiceArgs),
     /// Show effective local config.
@@ -65,6 +67,10 @@ pub struct ServiceArgs {
     /// Override TeaQL service URL. Deprecated: use --endpoint-prefix.
     #[arg(long)]
     pub service_url: Option<String>,
+
+    /// Override license file.
+    #[arg(long)]
+    pub license_file: Option<PathBuf>,
 
     /// Override request timeout in seconds.
     #[arg(long)]
