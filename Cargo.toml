@@ -1,6 +1,6 @@
 [package]
 name = "cargo-teaql"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2024"
 description = "Rust CLI for TeaQL service code generation workflows"
 license = "MIT"
@@ -17,10 +17,10 @@ path = "src/main.rs"
 anyhow = "1.0"
 clap = { version = "4.5", features = ["derive"] }
 dialoguer = "0.12"
-reqwest = { version = "0.12", default-features = false, features = ["blocking", "multipart", "rustls-tls"] }
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "multipart", "rustls"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_yaml = "0.9"
 tempfile = "3.12"
 walkdir = "2.5"
-zip = { version = "2.2", default-features = false, features = ["deflate"] }
+zip = { version = "8.6", default-features = false, features = ["deflate"] }
