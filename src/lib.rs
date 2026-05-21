@@ -98,14 +98,24 @@ fn run_ping(args: ServiceArgs, cwd: PathBuf) -> Result<()> {
 }
 
 fn rewrite_args_for_alias(mut args: Vec<OsString>) -> Vec<OsString> {
-    if let Some(program_name) = args
+    let alias_name = args
         .first()
         .and_then(|arg| Path::new(arg).file_name())
         .and_then(|name| name.to_str())
-    {
+        .map(String::from);
+
+    if let Some(ref program_name) = alias_name {
         if let Some(subcommand) = alias_subcommand(program_name) {
             args[0] = OsString::from("teaql");
             args.insert(1, OsString::from(subcommand));
+            // Cargo passes the subcommand name (without the "cargo-" prefix)
+            // as the second argument, e.g.:
+            //   "cargo teaql-version" → argv[1] = "teaql-version"
+            // After rewriting, this becomes redundant; strip it.
+            let cargo_arg = program_name.strip_prefix("cargo-").unwrap_or(program_name);
+            if args.len() > 2 && args[2] == cargo_arg {
+                args.remove(2);
+            }
         }
     }
     args
@@ -233,6 +243,40 @@ mod tests {
         assert_eq!(rewritten[2], OsString::from("model.yml"));
         assert_eq!(rewritten[3], OsString::from("--cwd"));
         assert_eq!(rewritten[4], OsString::from("/workspace"));
+    }
+
+    #[test]
+    fn strips_cargo_injected_subcommand_name() {
+        // Cargo strips the "cargo-" prefix when passing the subcommand name:
+        // "cargo teaql-version" → argv = ["/path/to/cargo-teaql-version", "teaql-version"]
+        let args = vec![
+            OsString::from("/tmp/bin/cargo-teaql-version"),
+            OsString::from("teaql-version"),
+        ];
+
+        let rewritten = rewrite_args_for_alias(args);
+
+        assert_eq!(rewritten[0], OsString::from("teaql"));
+        assert_eq!(rewritten[1], OsString::from("version"));
+        assert_eq!(rewritten.len(), 2, "cargo-injected arg should be stripped");
+    }
+
+    #[test]
+    fn strips_cargo_injected_arg_for_gen_code_with_input() {
+        // "cargo teaql-gen-code model.xml"
+        // cargo passes: argv = ["/path/to/cargo-teaql-gen-code", "teaql-gen-code", "model.xml"]
+        let args = vec![
+            OsString::from("/tmp/bin/cargo-teaql-gen-code"),
+            OsString::from("teaql-gen-code"),
+            OsString::from("model.xml"),
+        ];
+
+        let rewritten = rewrite_args_for_alias(args);
+
+        assert_eq!(rewritten[0], OsString::from("teaql"));
+        assert_eq!(rewritten[1], OsString::from("gen-code"));
+        assert_eq!(rewritten[2], OsString::from("model.xml"));
+        assert_eq!(rewritten.len(), 3);
     }
 
     #[test]
