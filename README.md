@@ -5,7 +5,7 @@ Rust CLI for TeaQL code generation workflows.
 ## Commands
 
 ```bash
-cargo-teaql gen-code <model-path>
+cargo-teaql gen-lib <model-path>
 cargo-teaql gen-doc <model-path>
 cargo-teaql gen-model <model-path>
 cargo-teaql version
@@ -17,7 +17,7 @@ cargo-teaql install-links
 ### CLI flags
 
 ```bash
-cargo-teaql gen-code <model-path> \
+cargo-teaql gen-lib <model-path> \
   --endpoint-prefix https://api.teaql.io/latest/ \
   --license-file /path/to/license \
   --output ./build \
@@ -30,7 +30,7 @@ cargo-teaql gen-code <model-path> \
 If you create symlink aliases to the same binary, these names also work:
 
 ```bash
-cargo teaql-gen-code <model-path>
+cargo teaql-gen-lib <model-path>
 cargo teaql-gen-doc <model-path>
 cargo teaql-gen-model <model-path>
 cargo teaql-version
@@ -48,7 +48,7 @@ This creates these symlinks next to the current executable:
 
 ```bash
 teaql
-cargo-teaql-gen-code
+cargo-teaql-gen-lib
 cargo-teaql-gen-doc
 cargo-teaql-gen-model
 cargo-teaql-version

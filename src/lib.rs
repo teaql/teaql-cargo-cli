@@ -45,7 +45,7 @@ pub fn run_cli(cli: Cli) -> Result<()> {
             println!("{}", serde_yaml::to_string(&config)?);
         }
         Commands::InstallLinks(args) => install_links(args)?,
-        Commands::GenCode(args) => run_generate(args, Some("rust-lib"), cli.cwd)?,
+        Commands::GenLib(args) => run_generate(args, Some("rust-lib"), cli.cwd)?,
         Commands::GenDoc(args) => run_generate(args, Some("doc"), cli.cwd)?,
         Commands::GenModel(args) => run_generate(args, Some("frontend"), cli.cwd)?,
         Commands::Version(args) => run_version(args, cli.cwd)?,
@@ -123,7 +123,7 @@ fn rewrite_args_for_alias(mut args: Vec<OsString>) -> Vec<OsString> {
 
 fn alias_subcommand(program_name: &str) -> Option<&'static str> {
     match program_name {
-        "cargo-teaql-gen-code" => Some("gen-code"),
+        "cargo-teaql-gen-lib" => Some("gen-lib"),
         "cargo-teaql-gen-doc" => Some("gen-doc"),
         "cargo-teaql-gen-model" => Some("gen-model"),
         "cargo-teaql-version" => Some("version"),
@@ -195,7 +195,7 @@ fn install_links(args: InstallLinksArgs) -> Result<()> {
 fn link_names() -> &'static [&'static str] {
     &[
         "teaql",
-        "cargo-teaql-gen-code",
+        "cargo-teaql-gen-lib",
         "cargo-teaql-gen-doc",
         "cargo-teaql-gen-model",
         "cargo-teaql-version",
@@ -230,7 +230,7 @@ mod tests {
     #[test]
     fn rewrites_alias_binary_name_to_subcommand() {
         let args = vec![
-            OsString::from("/tmp/bin/cargo-teaql-gen-code"),
+            OsString::from("/tmp/bin/cargo-teaql-gen-lib"),
             OsString::from("model.yml"),
             OsString::from("--cwd"),
             OsString::from("/workspace"),
@@ -239,7 +239,7 @@ mod tests {
         let rewritten = rewrite_args_for_alias(args);
 
         assert_eq!(rewritten[0], OsString::from("teaql"));
-        assert_eq!(rewritten[1], OsString::from("gen-code"));
+        assert_eq!(rewritten[1], OsString::from("gen-lib"));
         assert_eq!(rewritten[2], OsString::from("model.yml"));
         assert_eq!(rewritten[3], OsString::from("--cwd"));
         assert_eq!(rewritten[4], OsString::from("/workspace"));
@@ -262,19 +262,19 @@ mod tests {
     }
 
     #[test]
-    fn strips_cargo_injected_arg_for_gen_code_with_input() {
-        // "cargo teaql-gen-code model.xml"
-        // cargo passes: argv = ["/path/to/cargo-teaql-gen-code", "teaql-gen-code", "model.xml"]
+    fn strips_cargo_injected_arg_for_gen_lib_with_input() {
+        // "cargo teaql-gen-lib model.xml"
+        // cargo passes: argv = ["/path/to/cargo-teaql-gen-lib", "teaql-gen-lib", "model.xml"]
         let args = vec![
-            OsString::from("/tmp/bin/cargo-teaql-gen-code"),
-            OsString::from("teaql-gen-code"),
+            OsString::from("/tmp/bin/cargo-teaql-gen-lib"),
+            OsString::from("teaql-gen-lib"),
             OsString::from("model.xml"),
         ];
 
         let rewritten = rewrite_args_for_alias(args);
 
         assert_eq!(rewritten[0], OsString::from("teaql"));
-        assert_eq!(rewritten[1], OsString::from("gen-code"));
+        assert_eq!(rewritten[1], OsString::from("gen-lib"));
         assert_eq!(rewritten[2], OsString::from("model.xml"));
         assert_eq!(rewritten.len(), 3);
     }
@@ -291,7 +291,7 @@ mod tests {
     #[test]
     fn link_names_cover_all_aliases() {
         assert!(link_names().contains(&"teaql"));
-        assert!(link_names().contains(&"cargo-teaql-gen-code"));
+        assert!(link_names().contains(&"cargo-teaql-gen-lib"));
         assert!(link_names().contains(&"cargo-teaql-gen-doc"));
         assert!(link_names().contains(&"cargo-teaql-gen-model"));
         assert!(link_names().contains(&"cargo-teaql-version"));

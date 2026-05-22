@@ -14,8 +14,8 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Commands {
-    /// Generate backend/domain code.
-    GenCode(GenerateArgs),
+    /// Generate backend/domain library code.
+    GenLib(GenerateArgs),
     /// Generate documentation output.
     GenDoc(GenerateArgs),
     /// Generate model/frontend output.

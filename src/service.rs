@@ -1,4 +1,8 @@
-use std::{collections::BTreeMap, io::Write, time::{Duration, Instant}};
+use std::{
+    collections::BTreeMap,
+    io::Write,
+    time::{Duration, Instant},
+};
 
 use anyhow::{Context, Result};
 use reqwest::blocking::{Client, multipart};
@@ -140,7 +144,10 @@ pub fn ping(config: &ResolvedConfig) -> Result<()> {
     let model_path = model_tmp.path().to_path_buf();
     println!("    written to      : {}", model_path.display());
     println!("    size            : {} bytes", DEMO_MODEL_XML.len());
-    println!("    elapsed         : {:.0}ms", t.elapsed().as_secs_f64() * 1000.0);
+    println!(
+        "    elapsed         : {:.0}ms",
+        t.elapsed().as_secs_f64() * 1000.0
+    );
 
     // ── step 3: resolve license ───────────────────────────────────────────────
     step(3, "Resolving license file");
@@ -152,7 +159,10 @@ pub fn ping(config: &ResolvedConfig) -> Result<()> {
     if !license_exists {
         println!("    → will use bundled public.LICENSE from crate assets");
     }
-    println!("    elapsed         : {:.0}ms", t.elapsed().as_secs_f64() * 1000.0);
+    println!(
+        "    elapsed         : {:.0}ms",
+        t.elapsed().as_secs_f64() * 1000.0
+    );
 
     // ── step 4: build HTTP client ─────────────────────────────────────────────
     step(4, "Building HTTP client");
@@ -162,7 +172,10 @@ pub fn ping(config: &ResolvedConfig) -> Result<()> {
         .build()
         .context("failed to build HTTP client")?;
     println!("    timeout         : {}s", config.timeout_seconds);
-    println!("    elapsed         : {:.0}ms", t.elapsed().as_secs_f64() * 1000.0);
+    println!(
+        "    elapsed         : {:.0}ms",
+        t.elapsed().as_secs_f64() * 1000.0
+    );
 
     // ── step 5: prepare license bytes ────────────────────────────────────────
     step(5, "Reading license bytes");
@@ -176,7 +189,10 @@ pub fn ping(config: &ResolvedConfig) -> Result<()> {
         bundled.to_vec()
     };
     println!("    size            : {} bytes", license_bytes.len());
-    println!("    elapsed         : {:.0}ms", t.elapsed().as_secs_f64() * 1000.0);
+    println!(
+        "    elapsed         : {:.0}ms",
+        t.elapsed().as_secs_f64() * 1000.0
+    );
 
     // ── step 6: POST to service ───────────────────────────────────────────────
     step(6, "Sending request to TeaQL service");
@@ -199,7 +215,10 @@ pub fn ping(config: &ResolvedConfig) -> Result<()> {
         .with_context(|| format!("network request failed: {}", endpoint));
 
     let elapsed_send = t.elapsed();
-    println!("    elapsed         : {:.0}ms", elapsed_send.as_secs_f64() * 1000.0);
+    println!(
+        "    elapsed         : {:.0}ms",
+        elapsed_send.as_secs_f64() * 1000.0
+    );
 
     let response = match response {
         Ok(r) => r,
@@ -207,7 +226,10 @@ pub fn ping(config: &ResolvedConfig) -> Result<()> {
             println!();
             println!("  ✗  PING FAILED — network error");
             println!("     {}", e);
-            println!("     total elapsed: {:.0}ms", total_start.elapsed().as_secs_f64() * 1000.0);
+            println!(
+                "     total elapsed: {:.0}ms",
+                total_start.elapsed().as_secs_f64() * 1000.0
+            );
             return Err(e);
         }
     };
@@ -222,14 +244,20 @@ pub fn ping(config: &ResolvedConfig) -> Result<()> {
         .bytes()
         .with_context(|| "failed to read response body")?;
     println!("    body size       : {} bytes", body.len());
-    println!("    elapsed         : {:.0}ms", t.elapsed().as_secs_f64() * 1000.0);
+    println!(
+        "    elapsed         : {:.0}ms",
+        t.elapsed().as_secs_f64() * 1000.0
+    );
 
     if !status.is_success() {
         let text = String::from_utf8_lossy(&body);
         println!();
         println!("  ✗  PING FAILED — service returned HTTP {}", status);
         println!("     {}", text.lines().next().unwrap_or("(empty body)"));
-        println!("     total elapsed: {:.0}ms", total_start.elapsed().as_secs_f64() * 1000.0);
+        println!(
+            "     total elapsed: {:.0}ms",
+            total_start.elapsed().as_secs_f64() * 1000.0
+        );
         anyhow::bail!("service returned HTTP {}", status);
     }
 
@@ -237,8 +265,8 @@ pub fn ping(config: &ResolvedConfig) -> Result<()> {
     step(8, "Inspecting generated zip archive");
     let t = Instant::now();
     let cursor = std::io::Cursor::new(&body);
-    let mut archive = zip::ZipArchive::new(cursor)
-        .context("response is not a valid zip archive")?;
+    let mut archive =
+        zip::ZipArchive::new(cursor).context("response is not a valid zip archive")?;
 
     let mut file_list: Vec<String> = Vec::new();
     let mut has_error = false;
@@ -260,7 +288,10 @@ pub fn ping(config: &ResolvedConfig) -> Result<()> {
     for f in &file_list {
         println!("{}", f);
     }
-    println!("    elapsed         : {:.0}ms", t.elapsed().as_secs_f64() * 1000.0);
+    println!(
+        "    elapsed         : {:.0}ms",
+        t.elapsed().as_secs_f64() * 1000.0
+    );
 
     // ── step 9: final result ──────────────────────────────────────────────────
     step(9, "Result");
@@ -306,8 +337,6 @@ fn chrono_now() -> String {
     let s = secs % 60;
     format!("{:02}:{:02}:{:02} UTC", h, m, s)
 }
-
-
 
 #[cfg(test)]
 mod tests {
