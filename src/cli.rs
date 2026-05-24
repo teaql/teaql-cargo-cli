@@ -20,6 +20,8 @@ pub enum Commands {
     GenDoc(GenerateArgs),
     /// Generate model/frontend output.
     GenModel(GenerateArgs),
+    /// Generate Rust workspace output.
+    GenWorkspace(GenerateArgs),
     /// Ping the TeaQL service: runs a built-in demo model and prints detailed diagnostics.
     Ping(ServiceArgs),
     /// Show TeaQL service version information.

@@ -48,6 +48,7 @@ pub fn run_cli(cli: Cli) -> Result<()> {
         Commands::GenLib(args) => run_generate(args, Some("rust-lib"), cli.cwd)?,
         Commands::GenDoc(args) => run_generate(args, Some("doc"), cli.cwd)?,
         Commands::GenModel(args) => run_generate(args, Some("frontend"), cli.cwd)?,
+        Commands::GenWorkspace(args) => run_generate(args, Some("rust-workspace"), cli.cwd)?,
         Commands::Version(args) => run_version(args, cli.cwd)?,
         Commands::Ping(args) => run_ping(args, cli.cwd)?,
     }
@@ -106,6 +107,13 @@ fn rewrite_args_for_alias(mut args: Vec<OsString>) -> Vec<OsString> {
 
     if let Some(ref program_name) = alias_name {
         if let Some(subcommand) = alias_subcommand(program_name) {
+            if args
+                .get(1)
+                .and_then(|arg| arg.to_str())
+                .is_some_and(|arg| arg == cargo_invoked_subcommand(program_name))
+            {
+                args.remove(1);
+            }
             args[0] = OsString::from("teaql");
             args.insert(1, OsString::from(subcommand));
             // Cargo passes the subcommand name (without the "cargo-" prefix)
@@ -126,12 +134,17 @@ fn alias_subcommand(program_name: &str) -> Option<&'static str> {
         "cargo-teaql-gen-lib" => Some("gen-lib"),
         "cargo-teaql-gen-doc" => Some("gen-doc"),
         "cargo-teaql-gen-model" => Some("gen-model"),
+        "cargo-teaql-gen-workspace" => Some("gen-workspace"),
         "cargo-teaql-version" => Some("version"),
         "cargo-teaql-ping" => Some("ping"),
         "cargo-teaql-show-config" => Some("show-config"),
         "cargo-teaql-config" => Some("config"),
         _ => None,
     }
+}
+
+fn cargo_invoked_subcommand(program_name: &str) -> &str {
+    program_name.strip_prefix("cargo-").unwrap_or(program_name)
 }
 
 fn install_links(args: InstallLinksArgs) -> Result<()> {
@@ -198,6 +211,7 @@ fn link_names() -> &'static [&'static str] {
         "cargo-teaql-gen-lib",
         "cargo-teaql-gen-doc",
         "cargo-teaql-gen-model",
+        "cargo-teaql-gen-workspace",
         "cargo-teaql-version",
         "cargo-teaql-show-config",
         "cargo-teaql-ping",
@@ -289,14 +303,47 @@ mod tests {
     }
 
     #[test]
+    fn removes_cargo_forwarded_subcommand_argument_for_aliases() {
+        let args = vec![
+            OsString::from("/tmp/bin/cargo-teaql-show-config"),
+            OsString::from("teaql-show-config"),
+            OsString::from("--cwd"),
+            OsString::from("/workspace"),
+        ];
+
+        let rewritten = rewrite_args_for_alias(args);
+
+        assert_eq!(rewritten[0], OsString::from("teaql"));
+        assert_eq!(rewritten[1], OsString::from("show-config"));
+        assert_eq!(rewritten[2], OsString::from("--cwd"));
+        assert_eq!(rewritten[3], OsString::from("/workspace"));
+        assert_eq!(rewritten.len(), 4);
+    }
+
+    #[test]
     fn link_names_cover_all_aliases() {
         assert!(link_names().contains(&"teaql"));
         assert!(link_names().contains(&"cargo-teaql-gen-lib"));
         assert!(link_names().contains(&"cargo-teaql-gen-doc"));
         assert!(link_names().contains(&"cargo-teaql-gen-model"));
+        assert!(link_names().contains(&"cargo-teaql-gen-workspace"));
         assert!(link_names().contains(&"cargo-teaql-version"));
         assert!(link_names().contains(&"cargo-teaql-show-config"));
         assert!(link_names().contains(&"cargo-teaql-ping"));
         assert!(link_names().contains(&"cargo-teaql-config"));
+    }
+
+    #[test]
+    fn rewrites_workspace_alias_binary_name_to_subcommand() {
+        let args = vec![
+            OsString::from("/tmp/bin/cargo-teaql-gen-workspace"),
+            OsString::from("model.yml"),
+        ];
+
+        let rewritten = rewrite_args_for_alias(args);
+
+        assert_eq!(rewritten[0], OsString::from("teaql"));
+        assert_eq!(rewritten[1], OsString::from("gen-workspace"));
+        assert_eq!(rewritten[2], OsString::from("model.yml"));
     }
 }

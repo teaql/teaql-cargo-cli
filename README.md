@@ -8,6 +8,7 @@ Rust CLI for TeaQL code generation workflows.
 cargo-teaql gen-lib <model-path>
 cargo-teaql gen-doc <model-path>
 cargo-teaql gen-model <model-path>
+cargo-teaql gen-workspace <model-path>
 cargo-teaql version
 cargo-teaql show-config
 cargo-teaql config
@@ -33,6 +34,7 @@ If you create symlink aliases to the same binary, these names also work:
 cargo teaql-gen-lib <model-path>
 cargo teaql-gen-doc <model-path>
 cargo teaql-gen-model <model-path>
+cargo teaql-gen-workspace <model-path>
 cargo teaql-version
 cargo teaql-show-config
 cargo teaql-config
@@ -51,6 +53,7 @@ teaql
 cargo-teaql-gen-lib
 cargo-teaql-gen-doc
 cargo-teaql-gen-model
+cargo-teaql-gen-workspace
 cargo-teaql-version
 cargo-teaql-show-config
 cargo-teaql-config
@@ -59,6 +62,7 @@ cargo-teaql-config
 You can also target a custom directory with `cargo-teaql install-links --dir /some/bin --force`.
 
 `gen-model` sends `scope=frontend` to the service.
+`gen-workspace` sends `scope=rust-workspace`.
 
 ## Configuration
 
