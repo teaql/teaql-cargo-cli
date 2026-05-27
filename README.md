@@ -26,6 +26,10 @@ cargo-teaql gen-lib <model-path> \
   --cwd /workspace/project
 ```
 
+### Directory vs Single File Upload
+When a **directory** is provided as input, `cargo-teaql` will normally compress it into a zip archive. The server expects exactly one file in the zip to be named `main.xml` to serve as the entry point.
+However, if a directory is provided but it **does not contain a `main.xml`**, the CLI will search for a single `.xml` or `.ksml` model file. If it finds exactly one such file, it will **bypass compression** and upload that single file directly. Single-file uploads do not require the name `main.xml`. If multiple files are found and no `main.xml` is present, the CLI will abort with an error.
+
 ### Symlink aliases
 
 If you create symlink aliases to the same binary, these names also work:

@@ -39,6 +39,11 @@ pub fn generate(input: &Path, scope: Option<&str>, config: &ResolvedConfig) -> R
     println!("model input: {}", input.display());
     let zip_bytes = request_generation(&upload_path, scope, config)?;
     let archive_path = config.build_dir.join("domain.zip");
+    let error_file = config.build_dir.join("error.txt");
+    if error_file.exists() {
+        let _ = fs::remove_file(&error_file);
+    }
+    
     fs::write(&archive_path, &zip_bytes)
         .with_context(|| format!("failed to write {}", archive_path.display()))?;
 
@@ -59,6 +64,30 @@ pub fn generate(input: &Path, scope: Option<&str>, config: &ResolvedConfig) -> R
 fn prepare_upload(input: &Path) -> Result<PathBuf> {
     if input.is_file() {
         return Ok(input.to_path_buf());
+    }
+
+    if input.is_dir() && !input.join("main.xml").exists() {
+        let mut model_files = Vec::new();
+        for entry in fs::read_dir(input).context("failed to read input directory")? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_file() {
+                if let Some(ext) = path.extension() {
+                    if ext == "xml" || ext == "ksml" {
+                        model_files.push(path);
+                    }
+                }
+            }
+        }
+        
+        if model_files.len() == 1 {
+            println!("note: uploading {} directly since no main.xml was found in directory", model_files[0].display());
+            return Ok(model_files[0].clone());
+        } else if model_files.is_empty() {
+            bail!("no model files (.xml or .ksml) found in directory {}", input.display());
+        } else {
+            bail!("multiple model files found in {} but no main.xml. Please rename your entry point to main.xml", input.display());
+        }
     }
 
     let mut temp = NamedTempFile::new().context("failed to create temp zip file")?;
