@@ -32,6 +32,38 @@ pub enum Commands {
     Config,
     /// Install symlink aliases for cargo-style command names.
     InstallLinks(InstallLinksArgs),
+    /// Evaluate a KSML model input and report diagnostics.
+    Eval(EvalArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct EvalArgs {
+    /// Model file, directory, or zip to evaluate.
+    pub input: PathBuf,
+
+    /// Server base URL. Defaults to the configured TeaQL API URL.
+    #[arg(long, alias = "server")]
+    pub endpoint_prefix: Option<String>,
+
+    /// Override TeaQL service URL. Deprecated: use --endpoint-prefix.
+    #[arg(long)]
+    pub service_url: Option<String>,
+
+    /// Output format. Defaults to text.
+    #[arg(long, default_value = "text")]
+    pub format: String,
+
+    /// Write the raw JSON report to a file.
+    #[arg(long)]
+    pub output: Option<PathBuf>,
+
+    /// Exit non-zero when warnings exist.
+    #[arg(long)]
+    pub fail_on_warning: bool,
+
+    /// Override request timeout in seconds.
+    #[arg(long)]
+    pub timeout_seconds: Option<u64>,
 }
 
 #[derive(Debug, Args)]

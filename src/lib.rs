@@ -2,6 +2,7 @@ pub mod cli;
 pub mod config;
 pub mod generator;
 pub mod service;
+pub mod eval;
 
 use std::{
     ffi::OsString,
@@ -11,7 +12,7 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 use clap::Parser;
-use cli::{Cli, Commands, GenerateArgs, InstallLinksArgs, ServiceArgs};
+use cli::{Cli, Commands, GenerateArgs, InstallLinksArgs, ServiceArgs, EvalArgs};
 use config::{ConfigOverrides, EnvConfig, TeaqlConfig, config_file_path};
 
 pub fn run_from_env() -> Result<()> {
@@ -51,9 +52,27 @@ pub fn run_cli(cli: Cli) -> Result<()> {
         Commands::GenWorkspace(args) => run_generate(args, Some("rust-workspace"), cli.cwd)?,
         Commands::Version(args) => run_version(args, cli.cwd)?,
         Commands::Ping(args) => run_ping(args, cli.cwd)?,
+        Commands::Eval(args) => {
+            let code = run_eval(args, cli.cwd)?;
+            std::process::exit(code);
+        }
     }
 
     Ok(())
+}
+
+fn run_eval(args: EvalArgs, cwd: PathBuf) -> Result<i32> {
+    let config = TeaqlConfig::load()?;
+    let env = EnvConfig::from_env();
+    let overrides = ConfigOverrides {
+        endpoint_prefix: args.endpoint_prefix.clone(),
+        service_url: args.service_url.clone(),
+        license_file: None,
+        build_dir: None,
+        timeout_seconds: args.timeout_seconds,
+    };
+    let resolved = config.resolve(overrides, &env, &cwd);
+    eval::evaluate(&args.input, &args, &resolved)
 }
 
 fn run_generate(args: GenerateArgs, scope: Option<&str>, cwd: PathBuf) -> Result<()> {
@@ -139,6 +158,7 @@ fn alias_subcommand(program_name: &str) -> Option<&'static str> {
         "cargo-teaql-ping" => Some("ping"),
         "cargo-teaql-show-config" => Some("show-config"),
         "cargo-teaql-config" => Some("config"),
+        "cargo-teaql-eval" => Some("eval"),
         _ => None,
     }
 }

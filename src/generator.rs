@@ -61,7 +61,7 @@ pub fn generate(input: &Path, scope: Option<&str>, config: &ResolvedConfig) -> R
     Ok(())
 }
 
-fn prepare_upload(input: &Path) -> Result<PathBuf> {
+pub(crate) fn prepare_upload(input: &Path) -> Result<PathBuf> {
     if input.is_file() {
         return Ok(input.to_path_buf());
     }
