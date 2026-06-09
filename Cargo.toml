@@ -1,0 +1,28 @@
+[package]
+name = "cargo-teaql"
+version = "0.2.0"
+edition = "2024"
+description = "Rust CLI for TeaQL service code generation workflows"
+license = "MIT"
+repository = "https://github.com/teaql/teaql-cargo-cli"
+homepage = "https://github.com/teaql/teaql-cargo-cli"
+readme = "README.md"
+include = ["src/**/*", "assets/**/*", "README.md", "LICENSE"]
+
+[[bin]]
+name = "cargo-teaql"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0"
+base64 = "0.22.1"
+chrono = "0.4.45"
+clap = { version = "4.5", features = ["derive"] }
+dialoguer = "0.12"
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "multipart", "rustls"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+tempfile = "3.12"
+walkdir = "2.5"
+zip = { version = "8.6", default-features = false, features = ["deflate"] }
