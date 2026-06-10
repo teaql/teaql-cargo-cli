@@ -128,9 +128,13 @@ fn request_generation(
         .header("Authorization", format!("Bearer {}", config.api_key))
         .multipart(form)
         .send()
-        .with_context(|| format!("request failed: {}", request_url))?
-        .error_for_status()
-        .with_context(|| format!("service returned error: {}", request_url))?;
+        .with_context(|| format!("request failed: {}", request_url))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().unwrap_or_default();
+        bail!("service returned error ({}):\n{}", status, body.trim());
+    }
 
     Ok(response.bytes()?.to_vec())
 }
