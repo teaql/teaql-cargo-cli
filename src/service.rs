@@ -225,12 +225,12 @@ pub fn ping(config: &ResolvedConfig) -> Result<()> {
         let text = String::from_utf8_lossy(&body);
         println!();
         println!("  ✗  PING FAILED — service returned HTTP {}", status);
-        println!("     {}", text.lines().next().unwrap_or("(empty body)"));
+        println!("     {}", text.trim());
         println!(
             "     total elapsed: {:.0}ms",
             total_start.elapsed().as_secs_f64() * 1000.0
         );
-        anyhow::bail!("service returned HTTP {}", status);
+        anyhow::bail!("service returned HTTP {}:\n{}", status, text.trim());
     }
 
     // ── step 8: inspect zip ───────────────────────────────────────────────────
