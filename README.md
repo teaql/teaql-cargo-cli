@@ -88,7 +88,7 @@ CLI flag  >  Environment variable  >  config.yml  >  Built-in default
 
 ### API Key (OOTB Free Usage)
 
-The CLI uses an Out-Of-The-Box (OOTB) default API key: `PLEASE_SET_YOUR_API_KEY`. 
+The CLI uses a built-in default Out-Of-The-Box (OOTB) API key. 
 This default key is fully functional and can be used freely for development, testing, and experimentation. **Users and AI agents do not need to sign up or search for a real API key to get started.** The service will accept this default key. 
 
 If you have a dedicated API key for higher rate limits or production usage, you can provide it via the `--api-key` CLI flag, the `TEAQL_API_KEY` environment variable, or in your `config.yml`.
@@ -102,7 +102,7 @@ Local config lives in `~/.teaql/config.yml`.
 
 ```yaml
 endpoint_prefix: https://api.teaql.io/latest/
-api_key: PLEASE_SET_YOUR_API_KEY        # optional — free OOTB usage
+api_key: "YOUR_API_KEY"           # optional — built-in free OOTB key used if omitted
 license_file: /path/to/your.LICENSE   # optional — bundled public.LICENSE used if omitted
 build_dir: build
 timeout_seconds: 300
@@ -119,7 +119,7 @@ At startup, the CLI prints where each effective config value came from:
 ```
   config (precedence: cli > env > config.yml > default):
     endpoint_prefix = https://api.teaql.io/latest/          (from: environment variable)
-    api_key         = PLEASE_SET_YOUR_API_KEY               (from: built-in default)
+    api_key         = ********                              (from: built-in default)
     license_file    = /home/user/.teaql/license       (from: ~/.teaql/config.yml)
     build_dir       = /workspace/build                (from: built-in default)
     timeout_seconds = 300                             (from: ~/.teaql/config.yml)

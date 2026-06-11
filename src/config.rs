@@ -161,7 +161,7 @@ impl TeaqlConfig {
         } else if let Some(ref p) = self.api_key {
             (p.clone(), ConfigSource::ConfigFile)
         } else {
-            ("eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJzdWIiOiJwdWJsaWMtdXNlciIsInBsYW4iOiJmcmVlIiwiZXhwIjoxNzk2NTcyOTY2fQ.4Ed_L1gGnyqQ8tnHrF3ASJDp2Ac0CdM0U6FXnIuubm1shyiAlkOconAGxEDWPNhxsEf2McGbSgoloMXgOzYjKw".to_string(), ConfigSource::Default)
+            ("eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJzdWIiOiJkZWZhdWx0LXVzZXIiLCJwbGFuIjoiZnJlZSIsImV4cCI6MTc5NjcxNDU0NH0.Dc7PQbvOBIm0U1hZhj9KGsXKrTaQTpEvacbZdWBBwVoqe2H1yqi4DQD6AeXeETFBo8oFfAnSeGpqY592iYj36Q".to_string(), ConfigSource::Default)
         };
 
         // ── build_dir: cli > env > config.yml > default ──
@@ -195,11 +195,7 @@ impl TeaqlConfig {
         );
         eprintln!(
             "    api_key       = {}  (from: {})",
-            if api_key == "PLEASE_SET_YOUR_API_KEY" {
-                "PLEASE_SET_YOUR_API_KEY"
-            } else {
-                "********"
-            },
+            "********",
             api_key_source.label(),
         );
         eprintln!(
@@ -213,7 +209,7 @@ impl TeaqlConfig {
             timeout_source.label(),
         );
 
-        if !api_key.is_empty() && api_key != "PLEASE_SET_YOUR_API_KEY" {
+        if !api_key.is_empty() {
             print_api_key_info(&api_key);
         }
 

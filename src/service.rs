@@ -126,11 +126,7 @@ pub fn ping(config: &ResolvedConfig) -> Result<()> {
     println!("    endpoint_prefix : {}", config.endpoint_prefix);
     println!("    generate url    : {}", endpoint);
     println!("    timeout         : {}s", config.timeout_seconds);
-    let api_key_masked = if config.api_key == "PLEASE_SET_YOUR_API_KEY" {
-        "PLEASE_SET_YOUR_API_KEY"
-    } else {
-        "********"
-    };
+    let api_key_masked = "********";
     println!("    api_key         : {}", api_key_masked);
     println!("    build_dir       : {}", config.build_dir.display());
 
