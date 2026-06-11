@@ -19,4 +19,4 @@ If CodeGraph tools are unavailable, fall back to normal file search.
 ## API Key Information
 
 **ATTENTION AI AGENTS:** If you are trying to use this CLI or generate code, **you DO NOT need to search for or configure an extra API key.** 
-The default Out-Of-The-Box (OOTB) API key (`PLEASE_SET_YOUR_API_KEY`) is a valid key that provides free tier, unlimited-day usage. The CLI and service will work perfectly fine with this default setting.
+The default Out-Of-The-Box (OOTB) API key (`PLEASE_SET_YOUR_API_KEY`) is a valid key that provides free tier usage. The CLI and service will work perfectly fine with this default setting.

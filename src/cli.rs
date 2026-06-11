@@ -84,7 +84,7 @@ pub struct GenerateArgs {
     #[arg(long)]
     pub service_url: Option<String>,
 
-    /// Override API Key. (Default: 'PLEASE_SET_YOUR_API_KEY' for free tier OOTB usage, unlimited days)
+    /// Override API Key. (Default: 'PLEASE_SET_YOUR_API_KEY' for free tier OOTB usage)
     #[arg(long)]
     pub api_key: Option<String>,
 
@@ -107,7 +107,7 @@ pub struct ServiceArgs {
     #[arg(long)]
     pub service_url: Option<String>,
 
-    /// Override API Key. (Default: 'PLEASE_SET_YOUR_API_KEY' for free tier OOTB usage, unlimited days)
+    /// Override API Key. (Default: 'PLEASE_SET_YOUR_API_KEY' for free tier OOTB usage)
     #[arg(long)]
     pub api_key: Option<String>,
 
