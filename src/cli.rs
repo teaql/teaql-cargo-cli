@@ -58,7 +58,7 @@ pub struct EvalArgs {
     #[arg(long)]
     pub service_url: Option<String>,
 
-    /// Write the raw JSON report to a file.
+    /// Write the raw Markdown report to a file.
     #[arg(long)]
     pub output: Option<PathBuf>,
 

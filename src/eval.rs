@@ -8,29 +8,6 @@ use crate::{
     cli::EvalArgs, config::ResolvedConfig, generator::prepare_upload, service::endpoint_url,
 };
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct KsmlEvaluationItem {
-    #[serde(rename = "ruleId")]
-    pub rule_id: String,
-    pub title: String,
-    pub message: String,
-    pub path: String,
-    #[serde(rename = "objectName")]
-    pub object_name: Option<String>,
-    #[serde(rename = "fieldName")]
-    pub field_name: Option<String>,
-    #[serde(rename = "xmlPath")]
-    pub xml_path: Option<String>,
-    #[serde(rename = "lineNumber")]
-    pub line_number: Option<i32>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct KsmlEvaluationResponse {
-    pub solids: Vec<KsmlEvaluationItem>,
-    pub warnings: Vec<KsmlEvaluationItem>,
-    pub errors: Vec<KsmlEvaluationItem>,
-}
 
 pub fn evaluate(input: &Path, args: &EvalArgs, config: &ResolvedConfig) -> Result<i32> {
     if !input.exists() {
@@ -134,21 +111,12 @@ pub fn evaluate(input: &Path, args: &EvalArgs, config: &ResolvedConfig) -> Resul
         }
     }
 
-    let eval_res: KsmlEvaluationResponse = match serde_json::from_str(&response_text) {
-        Ok(res) => res,
-        Err(e) => {
-            eprintln!("error: failed to parse evaluation response: {:#}", e);
-            eprintln!("raw response: {}", response_text);
-            return Ok(2);
-        }
-    };
-
     println!("{}", response_text);
 
     let mut exit_code = 0;
-    if !eval_res.errors.is_empty() {
+    if response_text.contains("## ❌ Errors") {
         exit_code = 1;
-    } else if !eval_res.warnings.is_empty() && args.fail_on_warning {
+    } else if response_text.contains("## ⚠️ Warnings") && args.fail_on_warning {
         exit_code = 1;
     }
 
