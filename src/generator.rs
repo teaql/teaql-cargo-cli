@@ -130,10 +130,31 @@ fn request_generation(
         .send()
         .with_context(|| format!("request failed: {}", request_url))?;
 
-    if !response.status().is_success() {
+    let content_type = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_lowercase();
+
+    let is_zip = content_type.contains("zip") || content_type.contains("octet-stream");
+
+    if !is_zip {
         let status = response.status();
         let body = response.text().unwrap_or_default();
-        bail!("service returned error ({}):\n{}", status, body.trim());
+        if status.is_success() {
+            println!("{}", body.trim());
+            std::process::exit(0);
+        } else {
+            eprintln!("{}", body.trim());
+            std::process::exit(1);
+        }
+    }
+
+    if !response.status().is_success() {
+        let body = response.text().unwrap_or_default();
+        eprintln!("{}", body.trim());
+        std::process::exit(1);
     }
 
     Ok(response.bytes()?.to_vec())
