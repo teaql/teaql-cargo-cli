@@ -9,6 +9,8 @@ cargo-teaql gen-lib <model-path>
 cargo-teaql gen-doc <model-path>
 cargo-teaql gen-model <model-path>
 cargo-teaql gen-workspace <model-path>
+cargo-teaql gen-service -s <service> <model-path>
+cargo-teaql list-services
 cargo-teaql version
 cargo-teaql show-config
 cargo-teaql config
@@ -39,6 +41,8 @@ cargo teaql-gen-lib <model-path>
 cargo teaql-gen-doc <model-path>
 cargo teaql-gen-model <model-path>
 cargo teaql-gen-workspace <model-path>
+cargo teaql-gen-service -s <service> <model-path>
+cargo teaql-list-services
 cargo teaql-version
 cargo teaql-show-config
 cargo teaql-config
@@ -58,6 +62,8 @@ cargo-teaql-gen-lib
 cargo-teaql-gen-doc
 cargo-teaql-gen-model
 cargo-teaql-gen-workspace
+cargo-teaql-gen-service
+cargo-teaql-list-services
 cargo-teaql-version
 cargo-teaql-show-config
 cargo-teaql-config
@@ -66,7 +72,8 @@ cargo-teaql-config
 You can also target a custom directory with `cargo-teaql install-links --dir /some/bin --force`.
 
 `gen-model` sends `scope=frontend` to the service.
-`gen-workspace` sends `scope=rust-workspace`.
+`gen-workspace` sends `scope=rust-app-console`.
+`gen-service` allows explicitly specifying the target service using `-s` or `--service`.
 
 ## Configuration
 
