@@ -5,24 +5,28 @@ Rust CLI for TeaQL code generation workflows.
 ## Commands
 
 ```bash
-cargo-teaql gen-lib <model-path>
-cargo-teaql gen-doc <model-path>
-cargo-teaql gen-model <model-path>
-cargo-teaql gen-workspace <model-path>
-cargo-teaql gen-service -s <service> <model-path>
-cargo-teaql list-services
+cargo-teaql <target-service> <model-path>
+
+# Examples:
+cargo-teaql java-app-console ./model
+cargo-teaql rust-lib-core ./model
+cargo-teaql services
 cargo-teaql version
 cargo-teaql show-config
 cargo-teaql config
 cargo-teaql install-links
 ```
 
+The CLI supports dynamic command routing. If the target service is not a built-in command, the CLI will automatically forward the request to the backend. If an input path is provided, it acts as a code generation target (e.g. `java-app-console`). If no input path is provided, it acts as a general GET request (e.g. `services`).
+
+If no arguments are provided at all, it automatically defaults to `cargo-teaql services`.
+
 ### CLI flags
 
 ```bash
-cargo-teaql gen-lib <model-path> \
-  --endpoint-prefix https://api.teaql.io/latest/ \
-  --license-file /path/to/license \
+cargo-teaql java-app-console <model-path> \
+  --endpoint-prefix http://localhost:8080/ \
+  --api-key ******** \
   --output ./build \
   --timeout-seconds 300 \
   --cwd /workspace/project
@@ -37,12 +41,8 @@ However, if a directory is provided but it **does not contain a `main.xml`**, th
 If you create symlink aliases to the same binary, these names also work:
 
 ```bash
-cargo teaql-gen-lib <model-path>
-cargo teaql-gen-doc <model-path>
-cargo teaql-gen-model <model-path>
-cargo teaql-gen-workspace <model-path>
-cargo teaql-gen-service -s <service> <model-path>
-cargo teaql-list-services
+cargo teaql-java-app-console <model-path>
+cargo teaql-services
 cargo teaql-version
 cargo teaql-show-config
 cargo teaql-config
@@ -54,26 +54,7 @@ Install the aliases automatically:
 cargo-teaql install-links
 ```
 
-This creates these symlinks next to the current executable:
-
-```bash
-teaql
-cargo-teaql-gen-lib
-cargo-teaql-gen-doc
-cargo-teaql-gen-model
-cargo-teaql-gen-workspace
-cargo-teaql-gen-service
-cargo-teaql-list-services
-cargo-teaql-version
-cargo-teaql-show-config
-cargo-teaql-config
-```
-
 You can also target a custom directory with `cargo-teaql install-links --dir /some/bin --force`.
-
-`gen-model` sends `scope=frontend` to the service.
-`gen-workspace` sends `scope=rust-app-console`.
-`gen-service` allows explicitly specifying the target service using `-s` or `--service`.
 
 ## Configuration
 
@@ -108,9 +89,8 @@ configuration should use `TEAQL_ENDPOINT_PREFIX`.
 Local config lives in `~/.teaql/config.yml`.
 
 ```yaml
-endpoint_prefix: https://api.teaql.io/latest/
+endpoint_prefix: http://localhost:8080/
 api_key: "YOUR_API_KEY"           # optional — built-in free OOTB key used if omitted
-license_file: /path/to/your.LICENSE   # optional — bundled public.LICENSE used if omitted
 build_dir: build
 timeout_seconds: 300
 ```
@@ -125,9 +105,8 @@ At startup, the CLI prints where each effective config value came from:
 
 ```
   config (precedence: cli > env > config.yml > default):
-    endpoint_prefix = https://api.teaql.io/latest/          (from: environment variable)
+    endpoint_prefix = http://localhost:8080/                (from: environment variable)
     api_key         = ********                              (from: built-in default)
-    license_file    = /home/user/.teaql/license       (from: ~/.teaql/config.yml)
     build_dir       = /workspace/build                (from: built-in default)
     timeout_seconds = 300                             (from: ~/.teaql/config.yml)
 ```
