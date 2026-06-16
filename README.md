@@ -25,7 +25,7 @@ If no arguments are provided at all, it automatically defaults to `cargo-teaql s
 
 ```bash
 cargo-teaql java-app-console <model-path> \
-  --endpoint-prefix http://localhost:8080/ \
+  --endpoint-prefix https://api.teaql.io/latest/ \
   --api-key ******** \
   --output ./build \
   --timeout-seconds 300 \
@@ -89,7 +89,7 @@ configuration should use `TEAQL_ENDPOINT_PREFIX`.
 Local config lives in `~/.teaql/config.yml`.
 
 ```yaml
-endpoint_prefix: http://localhost:8080/
+endpoint_prefix: https://api.teaql.io/latest/
 api_key: "YOUR_API_KEY"           # optional — built-in free OOTB key used if omitted
 build_dir: build
 timeout_seconds: 300
@@ -105,7 +105,7 @@ At startup, the CLI prints where each effective config value came from:
 
 ```
   config (precedence: cli > env > config.yml > default):
-    endpoint_prefix = http://localhost:8080/                (from: environment variable)
+    endpoint_prefix = https://api.teaql.io/latest/          (from: environment variable)
     api_key         = ********                              (from: built-in default)
     build_dir       = /workspace/build                (from: built-in default)
     timeout_seconds = 300                             (from: ~/.teaql/config.yml)
