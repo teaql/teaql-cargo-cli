@@ -4,13 +4,13 @@ use std::ffi::OsString;
 use clap::{Args, Parser, Subcommand};
 
 #[derive(Debug, Parser)]
-#[command(name = "teaql", version, about = "TeaQL toolchain")]
+#[command(name = "teaql", version, about = "TeaQL toolchain", disable_help_subcommand = true)]
 pub struct Cli {
     #[arg(long, global = true, default_value = ".")]
     pub cwd: PathBuf,
 
     #[command(subcommand)]
-    pub command: Commands,
+    pub command: Option<Commands>,
 }
 
 #[derive(Debug, Subcommand)]

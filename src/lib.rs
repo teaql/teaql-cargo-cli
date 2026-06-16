@@ -31,7 +31,8 @@ where
 }
 
 pub fn run_cli(cli: Cli) -> Result<()> {
-    match cli.command {
+    let command = cli.command.unwrap_or_else(|| Commands::Dynamic(vec![OsString::from("services")]));
+    match command {
         Commands::Config => {
             let config_path = config_file_path()?;
             let existing = TeaqlConfig::load()?;
