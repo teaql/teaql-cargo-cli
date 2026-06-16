@@ -12,7 +12,7 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 use clap::Parser;
-use cli::{CheckArgs, Cli, Commands, EvalArgs, GenerateArgs, InstallLinksArgs, ServiceArgs};
+use cli::{CheckArgs, Cli, Commands, EvalArgs, GenServiceArgs, GenerateArgs, InstallLinksArgs, ServiceArgs};
 use config::{ConfigOverrides, EnvConfig, TeaqlConfig, config_file_path};
 
 pub fn run_from_env() -> Result<()> {
@@ -49,8 +49,10 @@ pub fn run_cli(cli: Cli) -> Result<()> {
         Commands::GenLib(args) => run_generate(args, Some("rust-lib"), cli.cwd)?,
         Commands::GenDoc(args) => run_generate(args, Some("doc"), cli.cwd)?,
         Commands::GenModel(args) => run_generate(args, Some("frontend"), cli.cwd)?,
-        Commands::GenWorkspace(args) => run_generate(args, Some("rust-workspace"), cli.cwd)?,
+        Commands::GenWorkspace(args) => run_generate(args, Some("rust-app-console"), cli.cwd)?,
+        Commands::GenService(args) => run_generate(args.generate_args, Some(&args.service), cli.cwd)?,
         Commands::Version(args) => run_version(args, cli.cwd)?,
+        Commands::ListServices(args) => run_list_services(args, cli.cwd)?,
         Commands::Ping(args) => run_ping(args, cli.cwd)?,
         Commands::Eval(args) => {
             let code = run_eval(args, cli.cwd)?;
@@ -105,6 +107,20 @@ fn run_version(args: ServiceArgs, cwd: PathBuf) -> Result<()> {
     };
     let resolved = config.resolve(overrides, &env, &cwd);
     service::print_version(&resolved)
+}
+
+fn run_list_services(args: ServiceArgs, cwd: PathBuf) -> Result<()> {
+    let config = TeaqlConfig::load()?;
+    let env = EnvConfig::from_env();
+    let overrides = ConfigOverrides {
+        endpoint_prefix: args.endpoint_prefix,
+        service_url: args.service_url,
+        api_key: None,
+        build_dir: None,
+        timeout_seconds: args.timeout_seconds,
+    };
+    let resolved = config.resolve(overrides, &env, &cwd);
+    service::list_services(&resolved)
 }
 
 fn run_ping(args: ServiceArgs, cwd: PathBuf) -> Result<()> {

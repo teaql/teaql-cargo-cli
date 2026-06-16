@@ -26,6 +26,10 @@ pub enum Commands {
     Ping(ServiceArgs),
     /// Show TeaQL service version information.
     Version(ServiceArgs),
+    /// List available TeaQL services.
+    ListServices(ServiceArgs),
+    /// Generic code generator for a specific service target.
+    GenService(GenServiceArgs),
     /// Show effective local config.
     ShowConfig,
     /// Configure TeaQL in the current workspace.
@@ -95,6 +99,16 @@ pub struct GenerateArgs {
     /// Override request timeout in seconds.
     #[arg(long)]
     pub timeout_seconds: Option<u64>,
+}
+
+#[derive(Debug, Args)]
+pub struct GenServiceArgs {
+    #[command(flatten)]
+    pub generate_args: GenerateArgs,
+
+    /// The target service to generate (e.g. rust-app-console)
+    #[arg(long, short = 's')]
+    pub service: String,
 }
 
 #[derive(Debug, Args)]

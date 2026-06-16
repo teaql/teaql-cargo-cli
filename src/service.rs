@@ -27,6 +27,30 @@ pub fn print_version(config: &ResolvedConfig) -> Result<()> {
     Ok(())
 }
 
+pub fn list_services(config: &ResolvedConfig) -> Result<()> {
+    let request_url = endpoint_url(&config.endpoint_prefix, "services");
+    println!("using {}", request_url);
+
+    let client = Client::builder()
+        .timeout(Duration::from_secs(config.timeout_seconds))
+        .build()
+        .context("failed to build HTTP client")?;
+
+    let response = client
+        .get(&request_url)
+        .send()
+        .with_context(|| format!("request failed: {}", request_url))?
+        .error_for_status()
+        .with_context(|| format!("service returned error: {}", request_url))?;
+
+    let body = response
+        .text()
+        .with_context(|| format!("failed to read service response: {}", request_url))?;
+    
+    println!("\n{}", body);
+    Ok(())
+}
+
 fn request_version(config: &ResolvedConfig) -> Result<Value> {
     let request_url = endpoint_url(&config.endpoint_prefix, "version");
     println!("using {}", request_url);
