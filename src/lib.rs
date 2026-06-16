@@ -77,10 +77,14 @@ pub fn run_cli(cli: Cli) -> Result<()> {
             
             if let Some(ref input) = dyn_args.input {
                 // It has an input, so treat as a generate POST
-                generator::generate(input, Some(&target), &resolved)?;
+                generator::generate(input, Some(&target), &resolved).with_context(|| {
+                    format!("Command failed. Hint: If '{}' is not a valid generation target, run `cargo teaql services` to see available services.", target)
+                })?;
             } else {
                 // No input, treat as a GET request
-                service::dynamic_get(&resolved, &target)?;
+                service::dynamic_get(&resolved, &target).with_context(|| {
+                    format!("Command failed. Hint: If '{}' is not a valid remote command, run `cargo teaql services` to see available endpoints.", target)
+                })?;
             }
         }
     }
