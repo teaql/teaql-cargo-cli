@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::ffi::OsString;
 
 use clap::{Args, Parser, Subcommand};
 
@@ -14,32 +15,48 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Commands {
-    /// Generate backend/domain library code.
-    GenLib(GenerateArgs),
-    /// Generate documentation output.
-    GenDoc(GenerateArgs),
-    /// Generate model/frontend output.
-    GenModel(GenerateArgs),
-    /// Generate Rust workspace output.
-    GenWorkspace(GenerateArgs),
-    /// Ping the TeaQL service: runs a built-in demo model and prints detailed diagnostics.
-    Ping(ServiceArgs),
-    /// Show TeaQL service version information.
-    Version(ServiceArgs),
-    /// List available TeaQL services.
-    ListServices(ServiceArgs),
-    /// Generic code generator for a specific service target.
-    GenService(GenServiceArgs),
     /// Show effective local config.
     ShowConfig,
     /// Configure TeaQL in the current workspace.
     Config,
+    /// Ping the TeaQL service.
+    Ping(ServiceArgs),
     /// Install symlink aliases for cargo-style command names.
     InstallLinks(InstallLinksArgs),
     /// Evaluate a KSML model input and report diagnostics.
     Eval(EvalArgs),
     /// Run cargo check and map any compiler errors back to the source KSML (XML) file.
     Check(CheckArgs),
+    
+    #[command(external_subcommand)]
+    Dynamic(Vec<OsString>),
+}
+
+#[derive(Debug, Parser)]
+#[command(no_binary_name = true)]
+pub struct DynamicArgs {
+    /// The input model file or directory (if omitted, sends a GET request)
+    pub input: Option<PathBuf>,
+
+    /// Override TeaQL endpoint prefix.
+    #[arg(long)]
+    pub endpoint_prefix: Option<String>,
+
+    /// Override TeaQL service URL. Deprecated: use --endpoint-prefix.
+    #[arg(long)]
+    pub service_url: Option<String>,
+
+    /// Override API Key.
+    #[arg(long)]
+    pub api_key: Option<String>,
+
+    /// Override output directory.
+    #[arg(long)]
+    pub output: Option<PathBuf>,
+
+    /// Override request timeout in seconds.
+    #[arg(long)]
+    pub timeout_seconds: Option<u64>,
 }
 
 #[derive(Debug, Args)]

@@ -12,7 +12,7 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 use clap::Parser;
-use cli::{CheckArgs, Cli, Commands, EvalArgs, GenServiceArgs, GenerateArgs, InstallLinksArgs, ServiceArgs};
+use cli::{CheckArgs, Cli, Commands, EvalArgs, DynamicArgs, InstallLinksArgs};
 use config::{ConfigOverrides, EnvConfig, TeaqlConfig, config_file_path};
 
 pub fn run_from_env() -> Result<()> {
@@ -46,13 +46,6 @@ pub fn run_cli(cli: Cli) -> Result<()> {
             println!("{}", serde_yaml::to_string(&config)?);
         }
         Commands::InstallLinks(args) => install_links(args)?,
-        Commands::GenLib(args) => run_generate(args, Some("rust-lib"), cli.cwd)?,
-        Commands::GenDoc(args) => run_generate(args, Some("doc"), cli.cwd)?,
-        Commands::GenModel(args) => run_generate(args, Some("frontend"), cli.cwd)?,
-        Commands::GenWorkspace(args) => run_generate(args, Some("rust-app-console"), cli.cwd)?,
-        Commands::GenService(args) => run_generate(args.generate_args, Some(&args.service), cli.cwd)?,
-        Commands::Version(args) => run_version(args, cli.cwd)?,
-        Commands::ListServices(args) => run_list_services(args, cli.cwd)?,
         Commands::Ping(args) => run_ping(args, cli.cwd)?,
         Commands::Eval(args) => {
             let code = run_eval(args, cli.cwd)?;
@@ -61,6 +54,34 @@ pub fn run_cli(cli: Cli) -> Result<()> {
         Commands::Check(args) => {
             let code = run_check(args, cli.cwd)?;
             std::process::exit(code);
+        }
+        Commands::Dynamic(args) => {
+            if args.is_empty() {
+                bail!("no target specified");
+            }
+            let target = args[0].to_string_lossy().to_string();
+            
+            let parsed_args = args.into_iter().skip(1).collect::<Vec<_>>();
+            let dyn_args = DynamicArgs::parse_from(parsed_args);
+            
+            let config = TeaqlConfig::load()?;
+            let env = EnvConfig::from_env();
+            let overrides = ConfigOverrides {
+                endpoint_prefix: dyn_args.endpoint_prefix,
+                service_url: dyn_args.service_url,
+                api_key: dyn_args.api_key,
+                build_dir: dyn_args.output,
+                timeout_seconds: dyn_args.timeout_seconds,
+            };
+            let resolved = config.resolve(overrides, &env, &cli.cwd);
+            
+            if let Some(ref input) = dyn_args.input {
+                // It has an input, so treat as a generate POST
+                generator::generate(input, Some(&target), &resolved)?;
+            } else {
+                // No input, treat as a GET request
+                service::dynamic_get(&resolved, &target)?;
+            }
         }
     }
 
@@ -81,49 +102,7 @@ fn run_eval(args: EvalArgs, cwd: PathBuf) -> Result<i32> {
     eval::evaluate(&args.input, &args, &resolved)
 }
 
-fn run_generate(args: GenerateArgs, scope: Option<&str>, cwd: PathBuf) -> Result<()> {
-    let config = TeaqlConfig::load()?;
-    let env = EnvConfig::from_env();
-    let overrides = ConfigOverrides {
-        endpoint_prefix: args.endpoint_prefix,
-        service_url: args.service_url,
-        api_key: args.api_key,
-        build_dir: args.output,
-        timeout_seconds: args.timeout_seconds,
-    };
-    let resolved = config.resolve(overrides, &env, &cwd);
-    generator::generate(&args.input, scope, &resolved)
-}
-
-fn run_version(args: ServiceArgs, cwd: PathBuf) -> Result<()> {
-    let config = TeaqlConfig::load()?;
-    let env = EnvConfig::from_env();
-    let overrides = ConfigOverrides {
-        endpoint_prefix: args.endpoint_prefix,
-        service_url: args.service_url,
-        api_key: None,
-        build_dir: None,
-        timeout_seconds: args.timeout_seconds,
-    };
-    let resolved = config.resolve(overrides, &env, &cwd);
-    service::print_version(&resolved)
-}
-
-fn run_list_services(args: ServiceArgs, cwd: PathBuf) -> Result<()> {
-    let config = TeaqlConfig::load()?;
-    let env = EnvConfig::from_env();
-    let overrides = ConfigOverrides {
-        endpoint_prefix: args.endpoint_prefix,
-        service_url: args.service_url,
-        api_key: None,
-        build_dir: None,
-        timeout_seconds: args.timeout_seconds,
-    };
-    let resolved = config.resolve(overrides, &env, &cwd);
-    service::list_services(&resolved)
-}
-
-fn run_ping(args: ServiceArgs, cwd: PathBuf) -> Result<()> {
+fn run_ping(args: cli::ServiceArgs, cwd: PathBuf) -> Result<()> {
     let config = TeaqlConfig::load()?;
     let env = EnvConfig::from_env();
     let overrides = ConfigOverrides {
@@ -136,6 +115,8 @@ fn run_ping(args: ServiceArgs, cwd: PathBuf) -> Result<()> {
     let resolved = config.resolve(overrides, &env, &cwd);
     service::ping(&resolved)
 }
+
+// Removed hardcoded run_generate, run_version, run_list_services
 
 fn rewrite_args_for_alias(mut args: Vec<OsString>) -> Vec<OsString> {
     let alias_name = args
@@ -440,7 +421,7 @@ mod tests {
     #[test]
     fn strips_cargo_injected_subcommand_name() {
         // Cargo strips the "cargo-" prefix when passing the subcommand name:
-        // "cargo teaql-version" → argv = ["/path/to/cargo-teaql-version", "teaql-version"]
+        // "cargo teaql-version" -> argv = ["/path/to/cargo-teaql-version", "teaql-version"]
         let args = vec![
             OsString::from("/tmp/bin/cargo-teaql-version"),
             OsString::from("teaql-version"),
