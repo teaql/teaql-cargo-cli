@@ -76,15 +76,48 @@ pub fn run_cli(cli: Cli) -> Result<()> {
             };
             let resolved = config.resolve(overrides, &env, &cli.cwd);
             
-            if let Some(ref input) = dyn_args.input {
-                // It has an input, so treat as a generate POST
-                generator::generate(input, Some(&target), &resolved).with_context(|| {
-                    format!("Command failed. Hint: If '{}' is not a valid generation target, run `cargo teaql services` to see available services.", target)
+            let mut all_paths = vec![target.clone()];
+            let mut input = dyn_args.input.clone();
+
+            // Backward compatibility: If no --input is specified, but there is a trailing positional argument
+            // that looks like a model file, warn the user and use it as the input.
+            if input.is_none() && !dyn_args.paths.is_empty() {
+                let last = &dyn_args.paths[dyn_args.paths.len() - 1];
+                let path = Path::new(last);
+                if path.exists() && (last.ends_with(".xml") || last.ends_with(".ksml") || last.ends_with(".yml")) {
+                    eprintln!("Warning: Implicit model file '{}' detected as positional argument.", last);
+                    eprintln!("Warning: Please use `--input {}` in the future.", last);
+                    input = Some(PathBuf::from(last));
+                    let mut paths_without_last = dyn_args.paths.clone();
+                    paths_without_last.pop();
+                    all_paths.extend(paths_without_last);
+                } else {
+                    all_paths.extend(dyn_args.paths);
+                }
+            } else {
+                all_paths.extend(dyn_args.paths);
+            }
+
+            let input_path = input.unwrap_or_else(|| PathBuf::from("."));
+
+            let get_targets = ["version", "services"];
+            if all_paths.len() == 1 && get_targets.contains(&all_paths[0].as_str()) {
+                service::dynamic_get(&resolved, &all_paths[0]).with_context(|| {
+                    format!("Command failed. Hint: If '{}' is not a valid remote command, run `cargo teaql services`.", all_paths[0])
+                })?;
+                return Ok(());
+            }
+
+            if all_paths.len() == 1 {
+                // Single target (e.g. `rust-app-console`): POST to `/generate` with scope = target
+                generator::generate(&input_path, "generate", Some(&all_paths[0]), &resolved).with_context(|| {
+                    format!("Command failed. Hint: If '{}' is not a valid generation target, run `cargo teaql services` to see available services.", all_paths[0])
                 })?;
             } else {
-                // No input, treat as a GET request
-                service::dynamic_get(&resolved, &target).with_context(|| {
-                    format!("Command failed. Hint: If '{}' is not a valid remote command, run `cargo teaql services` to see available endpoints.", target)
+                // Multi-segment dynamic target (e.g. `assist task create`): POST directly to `/assist/task/create`
+                let endpoint_path = all_paths.join("/");
+                generator::generate(&input_path, &endpoint_path, None, &resolved).with_context(|| {
+                    format!("Command failed on dynamic endpoint: {}", endpoint_path)
                 })?;
             }
         }

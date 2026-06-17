@@ -35,7 +35,12 @@ pub enum Commands {
 #[derive(Debug, Parser)]
 #[command(no_binary_name = true)]
 pub struct DynamicArgs {
-    /// The input model file or directory (if omitted, sends a GET request)
+    /// Additional path segments for the dynamic endpoint
+    #[arg(trailing_var_arg = true, allow_hyphen_values = false)]
+    pub paths: Vec<String>,
+
+    /// The input model file or directory (defaults to current directory if not specified)
+    #[arg(long)]
     pub input: Option<PathBuf>,
 
     /// Override TeaQL endpoint prefix.
