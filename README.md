@@ -56,6 +56,29 @@ cargo-teaql install-links
 
 You can also target a custom directory with `cargo-teaql install-links --dir /some/bin --force`.
 
+## AI Agent Assist Commands
+
+TeaQL provides specialized assist commands designed to help AI coding agents (and developers) quickly generate safe, compliant boilerplate templates for various business scenarios. 
+
+The command format is:
+`cargo-teaql <lang>-assist-<action>/<entity> --input <model_file>`
+
+Currently supported `rust-assist-*` targets:
+- `rust-assist-query`: Generate a comprehensive query template with field selections and mandatory `.purpose()`/`.comment()` cascades.
+- `rust-assist-list-page`: Generate a paginated query list template.
+- `rust-assist-create`: Generate an entity creation template with proper `.audit_as()` constraints.
+- `rust-assist-update`: Generate an entity update template.
+- `rust-assist-delete`: Generate an entity deletion template safely.
+- `rust-assist-expression`: Generate advanced business expression calculation templates using `E::`.
+
+*(Note: The exact same variations are also available for `java-assist-*`)*
+
+**Example Usage:**
+```bash
+cargo-teaql rust-assist-query/book --input modeling/bookstore.xml
+cargo-teaql java-assist-create/customer --input modeling/bookstore.xml
+```
+
 ## Configuration
 
 ### Precedence (highest wins)
