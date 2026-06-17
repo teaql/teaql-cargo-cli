@@ -164,7 +164,11 @@ fn rewrite_args_for_alias(mut args: Vec<OsString>) -> Vec<OsString> {
         .map(String::from);
 
     if let Some(ref program_name) = alias_name {
-        if let Some(subcommand) = alias_subcommand(program_name) {
+        if program_name == "cargo-teaql" {
+            if args.len() > 1 && args[1] == "teaql" {
+                args.remove(1);
+            }
+        } else if let Some(subcommand) = alias_subcommand(program_name) {
             if args
                 .get(1)
                 .and_then(|arg| arg.to_str())
