@@ -114,10 +114,16 @@ pub fn run_cli(cli: Cli) -> Result<()> {
             }
 
             if all_paths.len() == 1 {
-                // Single target (e.g. `rust-app-console`): POST to `/generate` with scope = target
-                generator::generate(&input_path, "generate", Some(&all_paths[0]), &resolved).with_context(|| {
-                    format!("Command failed. Hint: If '{}' is not a valid generation target, run `cargo teaql services` to see available services.", all_paths[0])
-                })?;
+                if all_paths[0] == "evaluate" {
+                    generator::generate(&input_path, "evaluate", None, &resolved).with_context(|| {
+                        "Command failed on evaluate endpoint.".to_string()
+                    })?;
+                } else {
+                    // Single target (e.g. `rust-app-console`): POST to `/generate` with scope = target
+                    generator::generate(&input_path, "generate", Some(&all_paths[0]), &resolved).with_context(|| {
+                        format!("Command failed. Hint: If '{}' is not a valid generation target, run `cargo teaql services` to see available services.", all_paths[0])
+                    })?;
+                }
             } else {
                 // Multi-segment dynamic target (e.g. `assist task create`): POST directly to `/assist/task/create`
                 let endpoint_path = all_paths.join("/");
