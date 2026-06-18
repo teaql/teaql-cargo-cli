@@ -71,7 +71,8 @@ pub fn run_cli(cli: Cli) -> Result<()> {
                 build_dir: cli.output.clone().or(dyn_args.output),
                 timeout_seconds: cli.timeout_seconds.or(dyn_args.timeout_seconds),
             };
-            let resolved = config.resolve(overrides, &env, &cli.cwd);
+            let effective_cwd = dyn_args.cwd.clone().unwrap_or(cli.cwd.clone());
+            let resolved = config.resolve(overrides, &env, &effective_cwd);
 
             let mut all_paths = vec![target.clone()];
             let mut input = cli.input.clone().or(dyn_args.input.clone());

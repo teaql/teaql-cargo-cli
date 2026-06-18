@@ -60,6 +60,10 @@ pub struct DynamicArgs {
     #[arg(trailing_var_arg = true, allow_hyphen_values = false)]
     pub paths: Vec<String>,
 
+    /// Override the working directory.
+    #[arg(long)]
+    pub cwd: Option<PathBuf>,
+
     /// The input model file or directory (defaults to current directory if not specified)
     #[arg(long)]
     pub input: Option<PathBuf>,
