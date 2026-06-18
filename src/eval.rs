@@ -8,7 +8,6 @@ use crate::{
     cli::EvalArgs, config::ResolvedConfig, generator::prepare_upload, service::endpoint_url,
 };
 
-
 pub fn evaluate(input: &Path, args: &EvalArgs, config: &ResolvedConfig) -> Result<i32> {
     if !input.exists() {
         eprintln!("error: input does not exist: {}", input.display());

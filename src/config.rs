@@ -233,11 +233,11 @@ fn print_api_key_info(token: &str) {
                 let sub = json["sub"].as_str().unwrap_or("unknown");
                 let plan = json["plan"].as_str().unwrap_or("unknown");
                 let mut exp_str = String::new();
-                
+
                 if let Some(exp) = json["exp"].as_i64() {
                     let now = chrono::Utc::now().timestamp();
                     let diff_secs = exp - now;
-                    
+
                     if let Some(dt) = chrono::DateTime::from_timestamp(exp, 0) {
                         let date_str = dt.format("%Y-%m-%d %H:%M:%S UTC").to_string();
                         if diff_secs < 0 {

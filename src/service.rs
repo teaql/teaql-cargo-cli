@@ -46,7 +46,7 @@ pub fn dynamic_get(config: &ResolvedConfig, endpoint: &str) -> Result<()> {
     let body = response
         .text()
         .with_context(|| format!("failed to read service response: {}", request_url))?;
-    
+
     // Check if it's JSON to pretty-print, otherwise just print raw
     if let Ok(value) = serde_json::from_str::<Value>(&body) {
         if let Ok(table) = format_key_value_table(&value) {

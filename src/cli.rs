@@ -1,13 +1,36 @@
-use std::path::PathBuf;
 use std::ffi::OsString;
+use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand};
 
 #[derive(Debug, Parser)]
-#[command(name = "teaql", version, about = "TeaQL toolchain", disable_help_subcommand = true)]
+#[command(
+    name = "teaql",
+    version,
+    about = "TeaQL toolchain",
+    disable_help_subcommand = true
+)]
 pub struct Cli {
     #[arg(long, global = true, default_value = ".")]
     pub cwd: PathBuf,
+
+    #[arg(long, global = true)]
+    pub input: Option<PathBuf>,
+
+    #[arg(long, global = true)]
+    pub endpoint_prefix: Option<String>,
+
+    #[arg(long, global = true)]
+    pub service_url: Option<String>,
+
+    #[arg(long, global = true)]
+    pub api_key: Option<String>,
+
+    #[arg(long, global = true)]
+    pub output: Option<PathBuf>,
+
+    #[arg(long, global = true)]
+    pub timeout_seconds: Option<u64>,
 
     #[command(subcommand)]
     pub command: Option<Commands>,
@@ -27,7 +50,7 @@ pub enum Commands {
     Eval(EvalArgs),
     /// Run cargo check and map any compiler errors back to the source KSML (XML) file.
     Check(CheckArgs),
-    
+
     #[command(external_subcommand)]
     Dynamic(Vec<OsString>),
 }

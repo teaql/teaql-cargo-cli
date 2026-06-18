@@ -16,7 +16,12 @@ use zip::{
 
 use crate::{config::ResolvedConfig, service::endpoint_url};
 
-pub fn generate(input: &Path, endpoint_path: &str, scope: Option<&str>, config: &ResolvedConfig) -> Result<()> {
+pub fn generate(
+    input: &Path,
+    endpoint_path: &str,
+    scope: Option<&str>,
+    config: &ResolvedConfig,
+) -> Result<()> {
     if !input.exists() {
         bail!("input does not exist: {}", input.display());
     }

@@ -12,7 +12,7 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 use clap::Parser;
-use cli::{CheckArgs, Cli, Commands, EvalArgs, DynamicArgs, InstallLinksArgs};
+use cli::{CheckArgs, Cli, Commands, DynamicArgs, EvalArgs, InstallLinksArgs};
 use config::{ConfigOverrides, EnvConfig, TeaqlConfig, config_file_path};
 
 pub fn run_from_env() -> Result<()> {
@@ -31,7 +31,9 @@ where
 }
 
 pub fn run_cli(cli: Cli) -> Result<()> {
-    let command = cli.command.unwrap_or_else(|| Commands::Dynamic(vec![OsString::from("services")]));
+    let command = cli
+        .command
+        .unwrap_or_else(|| Commands::Dynamic(vec![OsString::from("services")]));
     match command {
         Commands::Config => {
             let config_path = config_file_path()?;
@@ -61,31 +63,36 @@ pub fn run_cli(cli: Cli) -> Result<()> {
                 bail!("no target specified");
             }
             let target = args[0].to_string_lossy().to_string();
-            
+
             let parsed_args = args.into_iter().skip(1).collect::<Vec<_>>();
             let dyn_args = DynamicArgs::parse_from(parsed_args);
-            
+
             let config = TeaqlConfig::load()?;
             let env = EnvConfig::from_env();
             let overrides = ConfigOverrides {
-                endpoint_prefix: dyn_args.endpoint_prefix,
-                service_url: dyn_args.service_url,
-                api_key: dyn_args.api_key,
-                build_dir: dyn_args.output,
-                timeout_seconds: dyn_args.timeout_seconds,
+                endpoint_prefix: cli.endpoint_prefix.clone().or(dyn_args.endpoint_prefix),
+                service_url: cli.service_url.clone().or(dyn_args.service_url),
+                api_key: cli.api_key.clone().or(dyn_args.api_key),
+                build_dir: cli.output.clone().or(dyn_args.output),
+                timeout_seconds: cli.timeout_seconds.or(dyn_args.timeout_seconds),
             };
             let resolved = config.resolve(overrides, &env, &cli.cwd);
-            
+
             let mut all_paths = vec![target.clone()];
-            let mut input = dyn_args.input.clone();
+            let mut input = cli.input.clone().or(dyn_args.input.clone());
 
             // Backward compatibility: If no --input is specified, but there is a trailing positional argument
             // that looks like a model file, warn the user and use it as the input.
             if input.is_none() && !dyn_args.paths.is_empty() {
                 let last = &dyn_args.paths[dyn_args.paths.len() - 1];
                 let path = Path::new(last);
-                if path.exists() && (last.ends_with(".xml") || last.ends_with(".ksml") || last.ends_with(".yml")) {
-                    eprintln!("Warning: Implicit model file '{}' detected as positional argument.", last);
+                if path.exists()
+                    && (last.ends_with(".xml") || last.ends_with(".ksml") || last.ends_with(".yml"))
+                {
+                    eprintln!(
+                        "Warning: Implicit model file '{}' detected as positional argument.",
+                        last
+                    );
                     eprintln!("Warning: Please use `--input {}` in the future.", last);
                     input = Some(PathBuf::from(last));
                     let mut paths_without_last = dyn_args.paths.clone();
@@ -116,9 +123,9 @@ pub fn run_cli(cli: Cli) -> Result<()> {
             } else {
                 // Multi-segment dynamic target (e.g. `assist task create`): POST directly to `/assist/task/create`
                 let endpoint_path = all_paths.join("/");
-                generator::generate(&input_path, &endpoint_path, None, &resolved).with_context(|| {
-                    format!("Command failed on dynamic endpoint: {}", endpoint_path)
-                })?;
+                generator::generate(&input_path, &endpoint_path, None, &resolved).with_context(
+                    || format!("Command failed on dynamic endpoint: {}", endpoint_path),
+                )?;
             }
         }
     }
