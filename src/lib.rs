@@ -51,7 +51,8 @@ pub fn run_cli(cli: Cli) -> Result<()> {
         Commands::InstallLinks(args) => install_links(args)?,
         Commands::Ping(args) => run_ping(args, cli.cwd)?,
         Commands::Eval(args) => {
-            let code = run_eval(args, cli.cwd)?;
+            let input_path = cli.input.unwrap_or_else(|| PathBuf::from("."));
+            let code = run_eval(args, input_path, cli.cwd)?;
             std::process::exit(code);
         }
         Commands::Check(args) => {
@@ -136,7 +137,7 @@ pub fn run_cli(cli: Cli) -> Result<()> {
     Ok(())
 }
 
-fn run_eval(args: EvalArgs, cwd: PathBuf) -> Result<i32> {
+fn run_eval(args: EvalArgs, input_path: PathBuf, cwd: PathBuf) -> Result<i32> {
     let config = TeaqlConfig::load()?;
     let env = EnvConfig::from_env();
     let overrides = ConfigOverrides {
@@ -147,7 +148,7 @@ fn run_eval(args: EvalArgs, cwd: PathBuf) -> Result<i32> {
         timeout_seconds: args.timeout_seconds,
     };
     let resolved = config.resolve(overrides, &env, &cwd);
-    eval::evaluate(&args.input, &args, &resolved)
+    eval::evaluate(&input_path, &args, &resolved)
 }
 
 fn run_ping(args: cli::ServiceArgs, cwd: PathBuf) -> Result<()> {

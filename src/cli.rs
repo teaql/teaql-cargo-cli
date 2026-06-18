@@ -96,9 +96,6 @@ pub struct CheckArgs {
 
 #[derive(Debug, Args)]
 pub struct EvalArgs {
-    /// Model file, directory, or zip to evaluate.
-    pub input: PathBuf,
-
     /// Server base URL. Defaults to the configured TeaQL API URL.
     #[arg(long, alias = "server")]
     pub endpoint_prefix: Option<String>,
