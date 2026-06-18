@@ -46,8 +46,6 @@ pub enum Commands {
     Ping(ServiceArgs),
     /// Install symlink aliases for cargo-style command names.
     InstallLinks(InstallLinksArgs),
-    /// Evaluate a KSML model input and report diagnostics.
-    Eval(EvalArgs),
     /// Run cargo check and map any compiler errors back to the source KSML (XML) file.
     Check(CheckArgs),
 
@@ -94,28 +92,6 @@ pub struct CheckArgs {
     pub cargo_args: Vec<String>,
 }
 
-#[derive(Debug, Args)]
-pub struct EvalArgs {
-    /// Server base URL. Defaults to the configured TeaQL API URL.
-    #[arg(long, alias = "server")]
-    pub endpoint_prefix: Option<String>,
-
-    /// Override TeaQL service URL. Deprecated: use --endpoint-prefix.
-    #[arg(long)]
-    pub service_url: Option<String>,
-
-    /// Write the raw Markdown report to a file.
-    #[arg(long)]
-    pub output: Option<PathBuf>,
-
-    /// Exit non-zero when warnings exist.
-    #[arg(long)]
-    pub fail_on_warning: bool,
-
-    /// Override request timeout in seconds.
-    #[arg(long)]
-    pub timeout_seconds: Option<u64>,
-}
 
 #[derive(Debug, Args)]
 pub struct GenerateArgs {

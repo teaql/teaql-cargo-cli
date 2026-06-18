@@ -150,6 +150,9 @@ fn request_generation(
         let body = response.text().unwrap_or_default();
         if status.is_success() {
             println!("{}", body.trim());
+            if body.contains("## ❌ Errors") {
+                std::process::exit(1);
+            }
             std::process::exit(0);
         } else {
             eprintln!("{}", body.trim());

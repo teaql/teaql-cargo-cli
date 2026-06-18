@@ -1,6 +1,5 @@
 pub mod cli;
 pub mod config;
-pub mod eval;
 pub mod generator;
 pub mod service;
 
@@ -12,7 +11,7 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 use clap::Parser;
-use cli::{CheckArgs, Cli, Commands, DynamicArgs, EvalArgs, InstallLinksArgs};
+use cli::{CheckArgs, Cli, Commands, DynamicArgs, InstallLinksArgs};
 use config::{ConfigOverrides, EnvConfig, TeaqlConfig, config_file_path};
 
 pub fn run_from_env() -> Result<()> {
@@ -50,11 +49,6 @@ pub fn run_cli(cli: Cli) -> Result<()> {
         }
         Commands::InstallLinks(args) => install_links(args)?,
         Commands::Ping(args) => run_ping(args, cli.cwd)?,
-        Commands::Eval(args) => {
-            let input_path = cli.input.unwrap_or_else(|| PathBuf::from("."));
-            let code = run_eval(args, input_path, cli.cwd)?;
-            std::process::exit(code);
-        }
         Commands::Check(args) => {
             let code = run_check(args, cli.cwd)?;
             std::process::exit(code);
@@ -135,20 +129,6 @@ pub fn run_cli(cli: Cli) -> Result<()> {
     }
 
     Ok(())
-}
-
-fn run_eval(args: EvalArgs, input_path: PathBuf, cwd: PathBuf) -> Result<i32> {
-    let config = TeaqlConfig::load()?;
-    let env = EnvConfig::from_env();
-    let overrides = ConfigOverrides {
-        endpoint_prefix: args.endpoint_prefix.clone(),
-        service_url: args.service_url.clone(),
-        api_key: None,
-        build_dir: None,
-        timeout_seconds: args.timeout_seconds,
-    };
-    let resolved = config.resolve(overrides, &env, &cwd);
-    eval::evaluate(&input_path, &args, &resolved)
 }
 
 fn run_ping(args: cli::ServiceArgs, cwd: PathBuf) -> Result<()> {
