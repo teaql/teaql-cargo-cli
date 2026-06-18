@@ -105,6 +105,9 @@ pub fn run_cli(cli: Cli) -> Result<()> {
                 all_paths.extend(dyn_args.paths);
             }
 
+            // Flatten any paths that contain slashes so `cargo teaql rust-assist-query/school` works
+            let all_paths: Vec<String> = all_paths.into_iter().flat_map(|p| p.split('/').map(|s| s.to_string()).collect::<Vec<_>>()).collect();
+
             let input_path = input.unwrap_or_else(|| PathBuf::from("."));
 
             let get_targets = ["version", "services"];
