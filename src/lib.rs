@@ -72,7 +72,8 @@ pub fn run_cli(cli: Cli) -> Result<()> {
                 timeout_seconds: cli.timeout_seconds.or(dyn_args.timeout_seconds),
             };
             let effective_cwd = dyn_args.cwd.clone().unwrap_or(cli.cwd.clone());
-            let resolved = config.resolve(overrides, &env, &effective_cwd);
+            let print_info = cli.verbose || cli.debug;
+            let resolved = config.resolve(overrides, &env, &effective_cwd, print_info);
 
             let mut all_paths = vec![target.clone()];
             let mut input = cli.input.clone().or(dyn_args.input.clone());
@@ -148,7 +149,7 @@ fn run_ping(args: cli::ServiceArgs, cwd: PathBuf) -> Result<()> {
         build_dir: Some(std::env::temp_dir().join("teaql-ping")),
         timeout_seconds: args.timeout_seconds,
     };
-    let resolved = config.resolve(overrides, &env, &cwd);
+    let resolved = config.resolve(overrides, &env, &cwd, true);
     service::ping(&resolved)
 }
 

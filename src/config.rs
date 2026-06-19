@@ -136,6 +136,7 @@ impl TeaqlConfig {
         overrides: ConfigOverrides,
         env: &EnvConfig,
         cwd: &Path,
+        print_info: bool,
     ) -> ResolvedConfig {
         // ── endpoint_prefix: cli > env > config.yml > default ──
         let (endpoint_prefix, endpoint_prefix_source) = if let Some(v) = overrides.endpoint_prefix {
@@ -186,34 +187,36 @@ impl TeaqlConfig {
         };
 
         // ── print sources ──
-        eprintln!();
-        eprintln!("  config (precedence: cli > env > config.yml > default):");
-        eprintln!(
-            "    endpoint_prefix = {}  (from: {})",
-            endpoint_prefix,
-            endpoint_prefix_source.label(),
-        );
-        eprintln!(
-            "    api_key       = {}  (from: {})",
-            "********",
-            api_key_source.label(),
-        );
-        eprintln!(
-            "    build_dir     = {}  (from: {})",
-            build_dir.display(),
-            build_dir_source.label(),
-        );
-        eprintln!(
-            "    timeout_seconds = {}  (from: {})",
-            timeout_seconds,
-            timeout_source.label(),
-        );
+        if print_info {
+            eprintln!();
+            eprintln!("  config (precedence: cli > env > config.yml > default):");
+            eprintln!(
+                "    endpoint_prefix = {}  (from: {})",
+                endpoint_prefix,
+                endpoint_prefix_source.label(),
+            );
+            eprintln!(
+                "    api_key       = {}  (from: {})",
+                "********",
+                api_key_source.label(),
+            );
+            eprintln!(
+                "    build_dir     = {}  (from: {})",
+                build_dir.display(),
+                build_dir_source.label(),
+            );
+            eprintln!(
+                "    timeout_seconds = {}  (from: {})",
+                timeout_seconds,
+                timeout_source.label(),
+            );
 
-        if !api_key.is_empty() {
-            print_api_key_info(&api_key);
+            if !api_key.is_empty() {
+                print_api_key_info(&api_key);
+            }
+
+            eprintln!();
         }
-
-        eprintln!();
 
         ResolvedConfig {
             endpoint_prefix,
@@ -232,7 +235,7 @@ fn print_api_key_info(token: &str) {
             if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&decoded) {
                 let sub = json["sub"].as_str().unwrap_or("unknown");
                 let plan = json["plan"].as_str().unwrap_or("unknown");
-                let mut exp_str = String::new();
+                let exp_str;
 
                 if let Some(exp) = json["exp"].as_i64() {
                     let now = chrono::Utc::now().timestamp();
@@ -363,6 +366,7 @@ mod tests {
             },
             &EnvConfig::default(),
             cwd,
+            false,
         );
 
         assert_eq!(resolved.endpoint_prefix, "https://example.com/latest/");
@@ -386,6 +390,7 @@ mod tests {
             },
             &EnvConfig::default(),
             cwd,
+            false,
         );
 
         assert_eq!(resolved.endpoint_prefix, "https://override.test/latest/");
@@ -425,6 +430,7 @@ mod tests {
             },
             &env,
             cwd,
+            false,
         );
 
         assert_eq!(resolved.endpoint_prefix, "https://env.var/latest/");
@@ -456,6 +462,7 @@ mod tests {
             },
             &env,
             cwd,
+            false,
         );
 
         assert_eq!(resolved.endpoint_prefix, "https://cli.flag/latest/");
@@ -476,6 +483,7 @@ mod tests {
             },
             &EnvConfig::default(),
             cwd,
+            false,
         );
 
         assert_eq!(resolved.endpoint_prefix, "https://legacy.test/latest/");

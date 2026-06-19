@@ -14,6 +14,12 @@ pub struct Cli {
     #[arg(long, global = true, default_value = ".")]
     pub cwd: PathBuf,
 
+    #[arg(long, short, global = true)]
+    pub verbose: bool,
+
+    #[arg(long, global = true)]
+    pub debug: bool,
+
     #[arg(long, global = true)]
     pub input: Option<PathBuf>,
 
