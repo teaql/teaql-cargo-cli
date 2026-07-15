@@ -103,7 +103,10 @@ pub fn run_cli(cli: Cli) -> Result<()> {
             }
 
             // Flatten any paths that contain slashes so `cargo teaql rust-assist-query/school` works
-            let all_paths: Vec<String> = all_paths.into_iter().flat_map(|p| p.split('/').map(|s| s.to_string()).collect::<Vec<_>>()).collect();
+            let all_paths: Vec<String> = all_paths
+                .into_iter()
+                .flat_map(|p| p.split('/').map(|s| s.to_string()).collect::<Vec<_>>())
+                .collect();
 
             let input_path = input.unwrap_or_else(|| PathBuf::from("."));
 
@@ -117,9 +120,8 @@ pub fn run_cli(cli: Cli) -> Result<()> {
 
             if all_paths.len() == 1 {
                 if all_paths[0] == "evaluate" {
-                    generator::generate(&input_path, "evaluate", None, &resolved).with_context(|| {
-                        "Command failed on evaluate endpoint.".to_string()
-                    })?;
+                    generator::generate(&input_path, "evaluate", None, &resolved)
+                        .with_context(|| "Command failed on evaluate endpoint.".to_string())?;
                 } else {
                     // Single target (e.g. `rust-app-console`): POST to `/generate` with scope = target
                     generator::generate(&input_path, "generate", Some(&all_paths[0]), &resolved).with_context(|| {
@@ -325,28 +327,29 @@ fn run_check(args: CheckArgs, cwd: PathBuf) -> Result<i32> {
 
         if let Ok(cargo_json) = serde_json::from_str::<CargoJson>(&line)
             && cargo_json.reason == "compiler-message"
-                && let Some(diagnostic) = cargo_json.message {
-                    let mut mapped = false;
-                    for span in &diagnostic.spans {
-                        if span.is_primary
-                            && let Some((xml_path, xml_line)) = try_map_span(&cwd, span) {
-                                print_mapped_error(
-                                    &diagnostic.level,
-                                    &diagnostic.message,
-                                    &xml_path,
-                                    xml_line,
-                                    span,
-                                    &cwd,
-                                );
-                                mapped = true;
-                                break;
-                            }
-                    }
-                    if !mapped
-                        && let Some(rendered) = diagnostic.rendered {
-                            eprint!("{}", rendered);
-                        }
+            && let Some(diagnostic) = cargo_json.message
+        {
+            let mut mapped = false;
+            for span in &diagnostic.spans {
+                if span.is_primary
+                    && let Some((xml_path, xml_line)) = try_map_span(&cwd, span)
+                {
+                    print_mapped_error(
+                        &diagnostic.level,
+                        &diagnostic.message,
+                        &xml_path,
+                        xml_line,
+                        span,
+                        &cwd,
+                    );
+                    mapped = true;
+                    break;
                 }
+            }
+            if !mapped && let Some(rendered) = diagnostic.rendered {
+                eprint!("{}", rendered);
+            }
+        }
     }
 
     let status = child.wait()?;
@@ -415,15 +418,16 @@ fn print_mapped_error(
 
     let full_xml_path = cwd.join(xml_path);
     if full_xml_path.exists()
-        && let Ok(content) = std::fs::read_to_string(&full_xml_path) {
-            let lines: Vec<&str> = content.lines().collect();
-            if xml_line > 0 && xml_line <= lines.len() {
-                let line_content = lines[xml_line - 1];
-                eprintln!("   |");
-                eprintln!("{:3} | {}", xml_line, line_content);
-                eprintln!("   | (error generated from here)");
-            }
+        && let Ok(content) = std::fs::read_to_string(&full_xml_path)
+    {
+        let lines: Vec<&str> = content.lines().collect();
+        if xml_line > 0 && xml_line <= lines.len() {
+            let line_content = lines[xml_line - 1];
+            eprintln!("   |");
+            eprintln!("{:3} | {}", xml_line, line_content);
+            eprintln!("   | (error generated from here)");
         }
+    }
     eprintln!("   =");
     eprintln!(
         "   = note: generated Rust code in {}:{}:{} failed to compile",

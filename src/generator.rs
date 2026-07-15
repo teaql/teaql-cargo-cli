@@ -67,9 +67,10 @@ pub(crate) fn prepare_upload(input: &Path) -> Result<PathBuf> {
             let path = entry.path();
             if path.is_file()
                 && let Some(ext) = path.extension()
-                    && (ext == "xml" || ext == "ksml") {
-                        model_files.push(path);
-                    }
+                && (ext == "xml" || ext == "ksml")
+            {
+                model_files.push(path);
+            }
         }
 
         if model_files.len() == 1 {

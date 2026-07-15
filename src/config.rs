@@ -231,37 +231,38 @@ fn print_api_key_info(token: &str) {
     if parts.len() == 3 {
         use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
         if let Ok(decoded) = URL_SAFE_NO_PAD.decode(parts[1])
-            && let Ok(json) = serde_json::from_slice::<serde_json::Value>(&decoded) {
-                let sub = json["sub"].as_str().unwrap_or("unknown");
-                let plan = json["plan"].as_str().unwrap_or("unknown");
-                let exp_str;
+            && let Ok(json) = serde_json::from_slice::<serde_json::Value>(&decoded)
+        {
+            let sub = json["sub"].as_str().unwrap_or("unknown");
+            let plan = json["plan"].as_str().unwrap_or("unknown");
+            let exp_str;
 
-                if let Some(exp) = json["exp"].as_i64() {
-                    let now = chrono::Utc::now().timestamp();
-                    let diff_secs = exp - now;
+            if let Some(exp) = json["exp"].as_i64() {
+                let now = chrono::Utc::now().timestamp();
+                let diff_secs = exp - now;
 
-                    if let Some(dt) = chrono::DateTime::from_timestamp(exp, 0) {
-                        let date_str = dt.format("%Y-%m-%d %H:%M:%S UTC").to_string();
-                        if diff_secs < 0 {
-                            let days_ago = (-diff_secs) / (24 * 3600);
-                            exp_str = format!("{} (EXPIRED {} days ago!)", date_str, days_ago);
-                        } else {
-                            let days_left = diff_secs / (24 * 3600);
-                            exp_str = format!("{} ({} days remaining)", date_str, days_left);
-                        }
+                if let Some(dt) = chrono::DateTime::from_timestamp(exp, 0) {
+                    let date_str = dt.format("%Y-%m-%d %H:%M:%S UTC").to_string();
+                    if diff_secs < 0 {
+                        let days_ago = (-diff_secs) / (24 * 3600);
+                        exp_str = format!("{} (EXPIRED {} days ago!)", date_str, days_ago);
                     } else {
-                        exp_str = exp.to_string();
+                        let days_left = diff_secs / (24 * 3600);
+                        exp_str = format!("{} ({} days remaining)", date_str, days_left);
                     }
                 } else {
-                    exp_str = "never".to_string();
+                    exp_str = exp.to_string();
                 }
-
-                eprintln!();
-                eprintln!("  api_key permissions:");
-                eprintln!("    subject = {}", sub);
-                eprintln!("    plan    = {}", plan);
-                eprintln!("    expires = {}", exp_str);
+            } else {
+                exp_str = "never".to_string();
             }
+
+            eprintln!();
+            eprintln!("  api_key permissions:");
+            eprintln!("    subject = {}", sub);
+            eprintln!("    plan    = {}", plan);
+            eprintln!("    expires = {}", exp_str);
+        }
     }
 }
 

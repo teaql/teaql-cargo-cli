@@ -102,7 +102,6 @@ pub struct CheckArgs {
     pub cargo_args: Vec<String>,
 }
 
-
 #[derive(Debug, Args)]
 pub struct GenerateArgs {
     /// Model file or directory to upload.
