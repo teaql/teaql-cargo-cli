@@ -323,13 +323,13 @@ fn run_check(args: CheckArgs, cwd: PathBuf) -> Result<i32> {
             Err(_) => break,
         };
 
-        if let Ok(cargo_json) = serde_json::from_str::<CargoJson>(&line) {
-            if cargo_json.reason == "compiler-message" {
-                if let Some(diagnostic) = cargo_json.message {
+        if let Ok(cargo_json) = serde_json::from_str::<CargoJson>(&line)
+            && cargo_json.reason == "compiler-message"
+                && let Some(diagnostic) = cargo_json.message {
                     let mut mapped = false;
                     for span in &diagnostic.spans {
-                        if span.is_primary {
-                            if let Some((xml_path, xml_line)) = try_map_span(&cwd, span) {
+                        if span.is_primary
+                            && let Some((xml_path, xml_line)) = try_map_span(&cwd, span) {
                                 print_mapped_error(
                                     &diagnostic.level,
                                     &diagnostic.message,
@@ -341,16 +341,12 @@ fn run_check(args: CheckArgs, cwd: PathBuf) -> Result<i32> {
                                 mapped = true;
                                 break;
                             }
-                        }
                     }
-                    if !mapped {
-                        if let Some(rendered) = diagnostic.rendered {
+                    if !mapped
+                        && let Some(rendered) = diagnostic.rendered {
                             eprint!("{}", rendered);
                         }
-                    }
                 }
-            }
-        }
     }
 
     let status = child.wait()?;
@@ -418,8 +414,8 @@ fn print_mapped_error(
     eprintln!("  --> {}:{}", xml_path.display(), xml_line);
 
     let full_xml_path = cwd.join(xml_path);
-    if full_xml_path.exists() {
-        if let Ok(content) = std::fs::read_to_string(&full_xml_path) {
+    if full_xml_path.exists()
+        && let Ok(content) = std::fs::read_to_string(&full_xml_path) {
             let lines: Vec<&str> = content.lines().collect();
             if xml_line > 0 && xml_line <= lines.len() {
                 let line_content = lines[xml_line - 1];
@@ -428,7 +424,6 @@ fn print_mapped_error(
                 eprintln!("   | (error generated from here)");
             }
         }
-    }
     eprintln!("   =");
     eprintln!(
         "   = note: generated Rust code in {}:{}:{} failed to compile",

@@ -196,8 +196,7 @@ impl TeaqlConfig {
                 endpoint_prefix_source.label(),
             );
             eprintln!(
-                "    api_key       = {}  (from: {})",
-                "********",
+                "    api_key       = ********  (from: {})",
                 api_key_source.label(),
             );
             eprintln!(
@@ -231,8 +230,8 @@ fn print_api_key_info(token: &str) {
     let parts: Vec<&str> = token.split('.').collect();
     if parts.len() == 3 {
         use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
-        if let Ok(decoded) = URL_SAFE_NO_PAD.decode(parts[1]) {
-            if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&decoded) {
+        if let Ok(decoded) = URL_SAFE_NO_PAD.decode(parts[1])
+            && let Ok(json) = serde_json::from_slice::<serde_json::Value>(&decoded) {
                 let sub = json["sub"].as_str().unwrap_or("unknown");
                 let plan = json["plan"].as_str().unwrap_or("unknown");
                 let exp_str;
@@ -263,7 +262,6 @@ fn print_api_key_info(token: &str) {
                 eprintln!("    plan    = {}", plan);
                 eprintln!("    expires = {}", exp_str);
             }
-        }
     }
 }
 

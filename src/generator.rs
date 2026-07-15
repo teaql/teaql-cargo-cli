@@ -65,13 +65,11 @@ pub(crate) fn prepare_upload(input: &Path) -> Result<PathBuf> {
         for entry in fs::read_dir(input).context("failed to read input directory")? {
             let entry = entry?;
             let path = entry.path();
-            if path.is_file() {
-                if let Some(ext) = path.extension() {
-                    if ext == "xml" || ext == "ksml" {
+            if path.is_file()
+                && let Some(ext) = path.extension()
+                    && (ext == "xml" || ext == "ksml") {
                         model_files.push(path);
                     }
-                }
-            }
         }
 
         if model_files.len() == 1 {
