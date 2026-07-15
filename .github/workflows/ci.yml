@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install minimal stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+      - name: Check Formatting
+        run: cargo fmt -- --check
+      - name: Run Clippy
+        run: cargo clippy -- -D warnings
+      - name: Run Tests
+        run: cargo test
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+      - name: Run Audit
+        run: cargo audit

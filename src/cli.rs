@@ -1,13 +1,42 @@
-use std::path::PathBuf;
 use std::ffi::OsString;
+use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand};
 
 #[derive(Debug, Parser)]
-#[command(name = "teaql", version, about = "TeaQL toolchain", disable_help_subcommand = true)]
+#[command(
+    name = "teaql",
+    version,
+    about = "TeaQL toolchain",
+    disable_help_subcommand = true
+)]
 pub struct Cli {
     #[arg(long, global = true, default_value = ".")]
     pub cwd: PathBuf,
+
+    #[arg(long, short, global = true)]
+    pub verbose: bool,
+
+    #[arg(long, global = true)]
+    pub debug: bool,
+
+    #[arg(long, global = true)]
+    pub input: Option<PathBuf>,
+
+    #[arg(long, global = true)]
+    pub endpoint_prefix: Option<String>,
+
+    #[arg(long, global = true)]
+    pub service_url: Option<String>,
+
+    #[arg(long, global = true)]
+    pub api_key: Option<String>,
+
+    #[arg(long, global = true)]
+    pub output: Option<PathBuf>,
+
+    #[arg(long, global = true)]
+    pub timeout_seconds: Option<u64>,
 
     #[command(subcommand)]
     pub command: Option<Commands>,
@@ -23,11 +52,9 @@ pub enum Commands {
     Ping(ServiceArgs),
     /// Install symlink aliases for cargo-style command names.
     InstallLinks(InstallLinksArgs),
-    /// Evaluate a KSML model input and report diagnostics.
-    Eval(EvalArgs),
     /// Run cargo check and map any compiler errors back to the source KSML (XML) file.
     Check(CheckArgs),
-    
+
     #[command(external_subcommand)]
     Dynamic(Vec<OsString>),
 }
@@ -35,7 +62,16 @@ pub enum Commands {
 #[derive(Debug, Parser)]
 #[command(no_binary_name = true)]
 pub struct DynamicArgs {
-    /// The input model file or directory (if omitted, sends a GET request)
+    /// Additional path segments for the dynamic endpoint
+    #[arg(trailing_var_arg = true, allow_hyphen_values = false)]
+    pub paths: Vec<String>,
+
+    /// Override the working directory.
+    #[arg(long)]
+    pub cwd: Option<PathBuf>,
+
+    /// The input model file or directory (defaults to current directory if not specified)
+    #[arg(long)]
     pub input: Option<PathBuf>,
 
     /// Override TeaQL endpoint prefix.
@@ -64,32 +100,6 @@ pub struct CheckArgs {
     /// Pass additional arguments to cargo check (e.g. --workspace, --tests).
     #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
     pub cargo_args: Vec<String>,
-}
-
-#[derive(Debug, Args)]
-pub struct EvalArgs {
-    /// Model file, directory, or zip to evaluate.
-    pub input: PathBuf,
-
-    /// Server base URL. Defaults to the configured TeaQL API URL.
-    #[arg(long, alias = "server")]
-    pub endpoint_prefix: Option<String>,
-
-    /// Override TeaQL service URL. Deprecated: use --endpoint-prefix.
-    #[arg(long)]
-    pub service_url: Option<String>,
-
-    /// Write the raw Markdown report to a file.
-    #[arg(long)]
-    pub output: Option<PathBuf>,
-
-    /// Exit non-zero when warnings exist.
-    #[arg(long)]
-    pub fail_on_warning: bool,
-
-    /// Override request timeout in seconds.
-    #[arg(long)]
-    pub timeout_seconds: Option<u64>,
 }
 
 #[derive(Debug, Args)]

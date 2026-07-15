@@ -16,7 +16,12 @@ use zip::{
 
 use crate::{config::ResolvedConfig, service::endpoint_url};
 
-pub fn generate(input: &Path, scope: Option<&str>, config: &ResolvedConfig) -> Result<()> {
+pub fn generate(
+    input: &Path,
+    endpoint_path: &str,
+    scope: Option<&str>,
+    config: &ResolvedConfig,
+) -> Result<()> {
     if !input.exists() {
         bail!("input does not exist: {}", input.display());
     }
@@ -26,7 +31,7 @@ pub fn generate(input: &Path, scope: Option<&str>, config: &ResolvedConfig) -> R
 
     let upload_path = prepare_upload(input)?;
     println!("model input: {}", input.display());
-    let zip_bytes = request_generation(&upload_path, scope, config)?;
+    let zip_bytes = request_generation(&upload_path, endpoint_path, scope, config)?;
     let archive_path = config.build_dir.join("domain.zip");
     let error_file = config.build_dir.join("error.txt");
     if error_file.exists() {
@@ -60,12 +65,11 @@ pub(crate) fn prepare_upload(input: &Path) -> Result<PathBuf> {
         for entry in fs::read_dir(input).context("failed to read input directory")? {
             let entry = entry?;
             let path = entry.path();
-            if path.is_file() {
-                if let Some(ext) = path.extension() {
-                    if ext == "xml" || ext == "ksml" {
-                        model_files.push(path);
-                    }
-                }
+            if path.is_file()
+                && let Some(ext) = path.extension()
+                && (ext == "xml" || ext == "ksml")
+            {
+                model_files.push(path);
             }
         }
 
@@ -95,6 +99,7 @@ pub(crate) fn prepare_upload(input: &Path) -> Result<PathBuf> {
 
 fn request_generation(
     upload_path: &Path,
+    endpoint_path: &str,
     scope: Option<&str>,
     config: &ResolvedConfig,
 ) -> Result<Vec<u8>> {
@@ -121,7 +126,7 @@ fn request_generation(
         form = form.text("scope", scope.to_string());
     }
 
-    let request_url = endpoint_url(&config.endpoint_prefix, "generate");
+    let request_url = endpoint_url(&config.endpoint_prefix, endpoint_path);
     println!("using {}", request_url);
     let response = client
         .post(&request_url)
@@ -144,6 +149,9 @@ fn request_generation(
         let body = response.text().unwrap_or_default();
         if status.is_success() {
             println!("{}", body.trim());
+            if body.contains("## ❌ Errors") {
+                std::process::exit(1);
+            }
             std::process::exit(0);
         } else {
             eprintln!("{}", body.trim());

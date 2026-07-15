@@ -136,6 +136,7 @@ impl TeaqlConfig {
         overrides: ConfigOverrides,
         env: &EnvConfig,
         cwd: &Path,
+        print_info: bool,
     ) -> ResolvedConfig {
         // ── endpoint_prefix: cli > env > config.yml > default ──
         let (endpoint_prefix, endpoint_prefix_source) = if let Some(v) = overrides.endpoint_prefix {
@@ -186,34 +187,35 @@ impl TeaqlConfig {
         };
 
         // ── print sources ──
-        eprintln!();
-        eprintln!("  config (precedence: cli > env > config.yml > default):");
-        eprintln!(
-            "    endpoint_prefix = {}  (from: {})",
-            endpoint_prefix,
-            endpoint_prefix_source.label(),
-        );
-        eprintln!(
-            "    api_key       = {}  (from: {})",
-            "********",
-            api_key_source.label(),
-        );
-        eprintln!(
-            "    build_dir     = {}  (from: {})",
-            build_dir.display(),
-            build_dir_source.label(),
-        );
-        eprintln!(
-            "    timeout_seconds = {}  (from: {})",
-            timeout_seconds,
-            timeout_source.label(),
-        );
+        if print_info {
+            eprintln!();
+            eprintln!("  config (precedence: cli > env > config.yml > default):");
+            eprintln!(
+                "    endpoint_prefix = {}  (from: {})",
+                endpoint_prefix,
+                endpoint_prefix_source.label(),
+            );
+            eprintln!(
+                "    api_key       = ********  (from: {})",
+                api_key_source.label(),
+            );
+            eprintln!(
+                "    build_dir     = {}  (from: {})",
+                build_dir.display(),
+                build_dir_source.label(),
+            );
+            eprintln!(
+                "    timeout_seconds = {}  (from: {})",
+                timeout_seconds,
+                timeout_source.label(),
+            );
 
-        if !api_key.is_empty() {
-            print_api_key_info(&api_key);
+            if !api_key.is_empty() {
+                print_api_key_info(&api_key);
+            }
+
+            eprintln!();
         }
-
-        eprintln!();
 
         ResolvedConfig {
             endpoint_prefix,
@@ -228,38 +230,38 @@ fn print_api_key_info(token: &str) {
     let parts: Vec<&str> = token.split('.').collect();
     if parts.len() == 3 {
         use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
-        if let Ok(decoded) = URL_SAFE_NO_PAD.decode(parts[1]) {
-            if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&decoded) {
-                let sub = json["sub"].as_str().unwrap_or("unknown");
-                let plan = json["plan"].as_str().unwrap_or("unknown");
-                let mut exp_str = String::new();
-                
-                if let Some(exp) = json["exp"].as_i64() {
-                    let now = chrono::Utc::now().timestamp();
-                    let diff_secs = exp - now;
-                    
-                    if let Some(dt) = chrono::DateTime::from_timestamp(exp, 0) {
-                        let date_str = dt.format("%Y-%m-%d %H:%M:%S UTC").to_string();
-                        if diff_secs < 0 {
-                            let days_ago = (-diff_secs) / (24 * 3600);
-                            exp_str = format!("{} (EXPIRED {} days ago!)", date_str, days_ago);
-                        } else {
-                            let days_left = diff_secs / (24 * 3600);
-                            exp_str = format!("{} ({} days remaining)", date_str, days_left);
-                        }
+        if let Ok(decoded) = URL_SAFE_NO_PAD.decode(parts[1])
+            && let Ok(json) = serde_json::from_slice::<serde_json::Value>(&decoded)
+        {
+            let sub = json["sub"].as_str().unwrap_or("unknown");
+            let plan = json["plan"].as_str().unwrap_or("unknown");
+            let exp_str;
+
+            if let Some(exp) = json["exp"].as_i64() {
+                let now = chrono::Utc::now().timestamp();
+                let diff_secs = exp - now;
+
+                if let Some(dt) = chrono::DateTime::from_timestamp(exp, 0) {
+                    let date_str = dt.format("%Y-%m-%d %H:%M:%S UTC").to_string();
+                    if diff_secs < 0 {
+                        let days_ago = (-diff_secs) / (24 * 3600);
+                        exp_str = format!("{} (EXPIRED {} days ago!)", date_str, days_ago);
                     } else {
-                        exp_str = exp.to_string();
+                        let days_left = diff_secs / (24 * 3600);
+                        exp_str = format!("{} ({} days remaining)", date_str, days_left);
                     }
                 } else {
-                    exp_str = "never".to_string();
+                    exp_str = exp.to_string();
                 }
-
-                eprintln!();
-                eprintln!("  api_key permissions:");
-                eprintln!("    subject = {}", sub);
-                eprintln!("    plan    = {}", plan);
-                eprintln!("    expires = {}", exp_str);
+            } else {
+                exp_str = "never".to_string();
             }
+
+            eprintln!();
+            eprintln!("  api_key permissions:");
+            eprintln!("    subject = {}", sub);
+            eprintln!("    plan    = {}", plan);
+            eprintln!("    expires = {}", exp_str);
         }
     }
 }
@@ -363,6 +365,7 @@ mod tests {
             },
             &EnvConfig::default(),
             cwd,
+            false,
         );
 
         assert_eq!(resolved.endpoint_prefix, "https://example.com/latest/");
@@ -386,6 +389,7 @@ mod tests {
             },
             &EnvConfig::default(),
             cwd,
+            false,
         );
 
         assert_eq!(resolved.endpoint_prefix, "https://override.test/latest/");
@@ -425,6 +429,7 @@ mod tests {
             },
             &env,
             cwd,
+            false,
         );
 
         assert_eq!(resolved.endpoint_prefix, "https://env.var/latest/");
@@ -456,6 +461,7 @@ mod tests {
             },
             &env,
             cwd,
+            false,
         );
 
         assert_eq!(resolved.endpoint_prefix, "https://cli.flag/latest/");
@@ -476,6 +482,7 @@ mod tests {
             },
             &EnvConfig::default(),
             cwd,
+            false,
         );
 
         assert_eq!(resolved.endpoint_prefix, "https://legacy.test/latest/");

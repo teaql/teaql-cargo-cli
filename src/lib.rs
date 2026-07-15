@@ -1,6 +1,5 @@
 pub mod cli;
 pub mod config;
-pub mod eval;
 pub mod generator;
 pub mod service;
 
@@ -12,7 +11,7 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 use clap::Parser;
-use cli::{CheckArgs, Cli, Commands, EvalArgs, DynamicArgs, InstallLinksArgs};
+use cli::{CheckArgs, Cli, Commands, DynamicArgs, InstallLinksArgs};
 use config::{ConfigOverrides, EnvConfig, TeaqlConfig, config_file_path};
 
 pub fn run_from_env() -> Result<()> {
@@ -31,7 +30,9 @@ where
 }
 
 pub fn run_cli(cli: Cli) -> Result<()> {
-    let command = cli.command.unwrap_or_else(|| Commands::Dynamic(vec![OsString::from("services")]));
+    let command = cli
+        .command
+        .unwrap_or_else(|| Commands::Dynamic(vec![OsString::from("services")]));
     match command {
         Commands::Config => {
             let config_path = config_file_path()?;
@@ -48,10 +49,6 @@ pub fn run_cli(cli: Cli) -> Result<()> {
         }
         Commands::InstallLinks(args) => install_links(args)?,
         Commands::Ping(args) => run_ping(args, cli.cwd)?,
-        Commands::Eval(args) => {
-            let code = run_eval(args, cli.cwd)?;
-            std::process::exit(code);
-        }
         Commands::Check(args) => {
             let code = run_check(args, cli.cwd)?;
             std::process::exit(code);
@@ -61,50 +58,87 @@ pub fn run_cli(cli: Cli) -> Result<()> {
                 bail!("no target specified");
             }
             let target = args[0].to_string_lossy().to_string();
-            
+
             let parsed_args = args.into_iter().skip(1).collect::<Vec<_>>();
             let dyn_args = DynamicArgs::parse_from(parsed_args);
-            
+
             let config = TeaqlConfig::load()?;
             let env = EnvConfig::from_env();
             let overrides = ConfigOverrides {
-                endpoint_prefix: dyn_args.endpoint_prefix,
-                service_url: dyn_args.service_url,
-                api_key: dyn_args.api_key,
-                build_dir: dyn_args.output,
-                timeout_seconds: dyn_args.timeout_seconds,
+                endpoint_prefix: cli.endpoint_prefix.clone().or(dyn_args.endpoint_prefix),
+                service_url: cli.service_url.clone().or(dyn_args.service_url),
+                api_key: cli.api_key.clone().or(dyn_args.api_key),
+                build_dir: cli.output.clone().or(dyn_args.output),
+                timeout_seconds: cli.timeout_seconds.or(dyn_args.timeout_seconds),
             };
-            let resolved = config.resolve(overrides, &env, &cli.cwd);
-            
-            if let Some(ref input) = dyn_args.input {
-                // It has an input, so treat as a generate POST
-                generator::generate(input, Some(&target), &resolved).with_context(|| {
-                    format!("Command failed. Hint: If '{}' is not a valid generation target, run `cargo teaql services` to see available services.", target)
-                })?;
+            let effective_cwd = dyn_args.cwd.clone().unwrap_or(cli.cwd.clone());
+            let print_info = cli.verbose || cli.debug;
+            let resolved = config.resolve(overrides, &env, &effective_cwd, print_info);
+
+            let mut all_paths = vec![target.clone()];
+            let mut input = cli.input.clone().or(dyn_args.input.clone());
+
+            // Backward compatibility: If no --input is specified, but there is a trailing positional argument
+            // that looks like a model file, warn the user and use it as the input.
+            if input.is_none() && !dyn_args.paths.is_empty() {
+                let last = &dyn_args.paths[dyn_args.paths.len() - 1];
+                let path = Path::new(last);
+                if path.exists()
+                    && (last.ends_with(".xml") || last.ends_with(".ksml") || last.ends_with(".yml"))
+                {
+                    eprintln!(
+                        "Warning: Implicit model file '{}' detected as positional argument.",
+                        last
+                    );
+                    eprintln!("Warning: Please use `--input {}` in the future.", last);
+                    input = Some(PathBuf::from(last));
+                    let mut paths_without_last = dyn_args.paths.clone();
+                    paths_without_last.pop();
+                    all_paths.extend(paths_without_last);
+                } else {
+                    all_paths.extend(dyn_args.paths);
+                }
             } else {
-                // No input, treat as a GET request
-                service::dynamic_get(&resolved, &target).with_context(|| {
-                    format!("Command failed. Hint: If '{}' is not a valid remote command, run `cargo teaql services` to see available endpoints.", target)
+                all_paths.extend(dyn_args.paths);
+            }
+
+            // Flatten any paths that contain slashes so `cargo teaql rust-assist-query/school` works
+            let all_paths: Vec<String> = all_paths
+                .into_iter()
+                .flat_map(|p| p.split('/').map(|s| s.to_string()).collect::<Vec<_>>())
+                .collect();
+
+            let input_path = input.unwrap_or_else(|| PathBuf::from("."));
+
+            let get_targets = ["version", "services"];
+            if all_paths.len() == 1 && get_targets.contains(&all_paths[0].as_str()) {
+                service::dynamic_get(&resolved, &all_paths[0]).with_context(|| {
+                    format!("Command failed. Hint: If '{}' is not a valid remote command, run `cargo teaql services`.", all_paths[0])
                 })?;
+                return Ok(());
+            }
+
+            if all_paths.len() == 1 {
+                if all_paths[0] == "evaluate" {
+                    generator::generate(&input_path, "evaluate", None, &resolved)
+                        .with_context(|| "Command failed on evaluate endpoint.".to_string())?;
+                } else {
+                    // Single target (e.g. `rust-app-console`): POST to `/generate` with scope = target
+                    generator::generate(&input_path, "generate", Some(&all_paths[0]), &resolved).with_context(|| {
+                        format!("Command failed. Hint: If '{}' is not a valid generation target, run `cargo teaql services` to see available services.", all_paths[0])
+                    })?;
+                }
+            } else {
+                // Multi-segment dynamic target (e.g. `assist task create`): POST directly to `/assist/task/create`
+                let endpoint_path = all_paths.join("/");
+                generator::generate(&input_path, &endpoint_path, None, &resolved).with_context(
+                    || format!("Command failed on dynamic endpoint: {}", endpoint_path),
+                )?;
             }
         }
     }
 
     Ok(())
-}
-
-fn run_eval(args: EvalArgs, cwd: PathBuf) -> Result<i32> {
-    let config = TeaqlConfig::load()?;
-    let env = EnvConfig::from_env();
-    let overrides = ConfigOverrides {
-        endpoint_prefix: args.endpoint_prefix.clone(),
-        service_url: args.service_url.clone(),
-        api_key: None,
-        build_dir: None,
-        timeout_seconds: args.timeout_seconds,
-    };
-    let resolved = config.resolve(overrides, &env, &cwd);
-    eval::evaluate(&args.input, &args, &resolved)
 }
 
 fn run_ping(args: cli::ServiceArgs, cwd: PathBuf) -> Result<()> {
@@ -117,7 +151,7 @@ fn run_ping(args: cli::ServiceArgs, cwd: PathBuf) -> Result<()> {
         build_dir: Some(std::env::temp_dir().join("teaql-ping")),
         timeout_seconds: args.timeout_seconds,
     };
-    let resolved = config.resolve(overrides, &env, &cwd);
+    let resolved = config.resolve(overrides, &env, &cwd, true);
     service::ping(&resolved)
 }
 
@@ -131,7 +165,11 @@ fn rewrite_args_for_alias(mut args: Vec<OsString>) -> Vec<OsString> {
         .map(String::from);
 
     if let Some(ref program_name) = alias_name {
-        if let Some(subcommand) = alias_subcommand(program_name) {
+        if program_name == "cargo-teaql" {
+            if args.len() > 1 && args[1] == "teaql" {
+                args.remove(1);
+            }
+        } else if let Some(subcommand) = alias_subcommand(program_name) {
             if args
                 .get(1)
                 .and_then(|arg| arg.to_str())
@@ -287,32 +325,29 @@ fn run_check(args: CheckArgs, cwd: PathBuf) -> Result<i32> {
             Err(_) => break,
         };
 
-        if let Ok(cargo_json) = serde_json::from_str::<CargoJson>(&line) {
-            if cargo_json.reason == "compiler-message" {
-                if let Some(diagnostic) = cargo_json.message {
-                    let mut mapped = false;
-                    for span in &diagnostic.spans {
-                        if span.is_primary {
-                            if let Some((xml_path, xml_line)) = try_map_span(&cwd, span) {
-                                print_mapped_error(
-                                    &diagnostic.level,
-                                    &diagnostic.message,
-                                    &xml_path,
-                                    xml_line,
-                                    span,
-                                    &cwd,
-                                );
-                                mapped = true;
-                                break;
-                            }
-                        }
-                    }
-                    if !mapped {
-                        if let Some(rendered) = diagnostic.rendered {
-                            eprint!("{}", rendered);
-                        }
-                    }
+        if let Ok(cargo_json) = serde_json::from_str::<CargoJson>(&line)
+            && cargo_json.reason == "compiler-message"
+            && let Some(diagnostic) = cargo_json.message
+        {
+            let mut mapped = false;
+            for span in &diagnostic.spans {
+                if span.is_primary
+                    && let Some((xml_path, xml_line)) = try_map_span(&cwd, span)
+                {
+                    print_mapped_error(
+                        &diagnostic.level,
+                        &diagnostic.message,
+                        &xml_path,
+                        xml_line,
+                        span,
+                        &cwd,
+                    );
+                    mapped = true;
+                    break;
                 }
+            }
+            if !mapped && let Some(rendered) = diagnostic.rendered {
+                eprint!("{}", rendered);
             }
         }
     }
@@ -382,15 +417,15 @@ fn print_mapped_error(
     eprintln!("  --> {}:{}", xml_path.display(), xml_line);
 
     let full_xml_path = cwd.join(xml_path);
-    if full_xml_path.exists() {
-        if let Ok(content) = std::fs::read_to_string(&full_xml_path) {
-            let lines: Vec<&str> = content.lines().collect();
-            if xml_line > 0 && xml_line <= lines.len() {
-                let line_content = lines[xml_line - 1];
-                eprintln!("   |");
-                eprintln!("{:3} | {}", xml_line, line_content);
-                eprintln!("   | (error generated from here)");
-            }
+    if full_xml_path.exists()
+        && let Ok(content) = std::fs::read_to_string(&full_xml_path)
+    {
+        let lines: Vec<&str> = content.lines().collect();
+        if xml_line > 0 && xml_line <= lines.len() {
+            let line_content = lines[xml_line - 1];
+            eprintln!("   |");
+            eprintln!("{:3} | {}", xml_line, line_content);
+            eprintln!("   | (error generated from here)");
         }
     }
     eprintln!("   =");
