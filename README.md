@@ -1,5 +1,7 @@
 # teaql-cli
 
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13620/badge)](https://www.bestpractices.dev/projects/13620)
+
 Rust CLI for TeaQL code generation workflows.
 
 ## Commands
