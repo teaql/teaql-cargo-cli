@@ -207,13 +207,24 @@ fn zip_directory(directory: &Path, writer: &mut File) -> Result<()> {
     let mut allowed_files = Vec::new();
     let main_xml = directory.join("main.xml");
     if main_xml.exists() {
-        allowed_files.push("main.xml".to_string());
-        if let Ok(content) = fs::read_to_string(&main_xml) {
-            for line in content.lines() {
-                if let Some(start) = line.find("<_include file=\"") {
-                    let rest = &line[start + 16..];
-                    if let Some(end) = rest.find("\"") {
-                        allowed_files.push(rest[..end].to_string());
+        let mut queue = vec!["main.xml".to_string()];
+        while let Some(file_name) = queue.pop() {
+            if allowed_files.contains(&file_name) {
+                continue;
+            }
+            allowed_files.push(file_name.clone());
+            
+            let file_path = directory.join(&file_name);
+            if let Ok(content) = fs::read_to_string(&file_path) {
+                for line in content.lines() {
+                    if let Some(start) = line.find("<_include file=\"") {
+                        let rest = &line[start + 16..];
+                        if let Some(end) = rest.find("\"") {
+                            let included = rest[..end].to_string();
+                            if !allowed_files.contains(&included) && !queue.contains(&included) {
+                                queue.push(included);
+                            }
+                        }
                     }
                 }
             }
@@ -307,6 +318,29 @@ mod tests {
 
         assert_eq!(root_content, "root");
         assert_eq!(child_content, "child");
+    }
+
+    #[test]
+    fn prepare_upload_zips_recursively_included_files() {
+        let temp = tempdir().unwrap();
+        let input_dir = temp.path().join("model");
+        fs::create_dir_all(input_dir.join("nested")).unwrap();
+        fs::write(input_dir.join("main.xml"), "<_include file=\"root.xml\" />").unwrap();
+        fs::write(input_dir.join("root.xml"), "<_include file=\"nested/child.xml\" />\nroot").unwrap();
+        fs::write(input_dir.join("nested").join("child.xml"), "child").unwrap();
+        fs::write(input_dir.join("garbage.xml"), "garbage").unwrap();
+
+        let upload = prepare_upload(&input_dir).unwrap();
+        let zip_bytes = fs::read(upload).unwrap();
+        let mut archive = ZipArchive::new(Cursor::new(zip_bytes)).unwrap();
+
+        // main.xml, root.xml, nested/child.xml should exist
+        assert!(archive.by_name("main.xml").is_ok());
+        assert!(archive.by_name("root.xml").is_ok());
+        assert!(archive.by_name("nested/child.xml").is_ok());
+        
+        // garbage.xml should be filtered out
+        assert!(archive.by_name("garbage.xml").is_err());
     }
 
     #[test]
