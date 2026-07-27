@@ -288,20 +288,20 @@ mod tests {
         let temp = tempdir().unwrap();
         let input_dir = temp.path().join("model");
         fs::create_dir_all(input_dir.join("nested")).unwrap();
-        fs::write(input_dir.join("main.xml"), "main").unwrap();
-        fs::write(input_dir.join("root.txt"), "root").unwrap();
-        fs::write(input_dir.join("nested").join("child.txt"), "child").unwrap();
+        fs::write(input_dir.join("main.xml"), "<_include file=\"root.xml\" />\n<_include file=\"nested/child.xml\" />").unwrap();
+        fs::write(input_dir.join("root.xml"), "root").unwrap();
+        fs::write(input_dir.join("nested").join("child.xml"), "child").unwrap();
 
         let upload = prepare_upload(&input_dir).unwrap();
         let zip_bytes = fs::read(upload).unwrap();
         let mut archive = ZipArchive::new(Cursor::new(zip_bytes)).unwrap();
 
-        let mut root = archive.by_name("root.txt").unwrap();
+        let mut root = archive.by_name("root.xml").unwrap();
         let mut root_content = String::new();
         root.read_to_string(&mut root_content).unwrap();
         drop(root);
 
-        let mut child = archive.by_name("nested/child.txt").unwrap();
+        let mut child = archive.by_name("nested/child.xml").unwrap();
         let mut child_content = String::new();
         child.read_to_string(&mut child_content).unwrap();
 
@@ -322,11 +322,11 @@ mod tests {
         extract_zip(&zip_bytes, &output_dir).unwrap();
 
         assert_eq!(
-            fs::read_to_string(output_dir.join("root.txt")).unwrap(),
+            fs::read_to_string(output_dir.join("root.xml")).unwrap(),
             "root"
         );
         assert_eq!(
-            fs::read_to_string(output_dir.join("nested").join("child.txt")).unwrap(),
+            fs::read_to_string(output_dir.join("nested").join("child.xml")).unwrap(),
             "child"
         );
     }
@@ -334,8 +334,8 @@ mod tests {
     fn create_fixture_tree(base: &Path) -> PathBuf {
         let fixture = base.join("fixture");
         fs::create_dir_all(fixture.join("nested")).unwrap();
-        fs::write(fixture.join("root.txt"), "root").unwrap();
-        fs::write(fixture.join("nested").join("child.txt"), "child").unwrap();
+        fs::write(fixture.join("root.xml"), "root").unwrap();
+        fs::write(fixture.join("nested").join("child.xml"), "child").unwrap();
         fixture
     }
 }
