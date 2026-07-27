@@ -204,6 +204,22 @@ fn zip_directory(directory: &Path, writer: &mut File) -> Result<()> {
     let options: FileOptions<'_, ExtendedFileOptions> =
         FileOptions::default().compression_method(CompressionMethod::Deflated);
 
+    let mut allowed_files = Vec::new();
+    let main_xml = directory.join("main.xml");
+    if main_xml.exists() {
+        allowed_files.push("main.xml".to_string());
+        if let Ok(content) = fs::read_to_string(&main_xml) {
+            for line in content.lines() {
+                if let Some(start) = line.find("<_include file=\"") {
+                    let rest = &line[start + 16..];
+                    if let Some(end) = rest.find("\"") {
+                        allowed_files.push(rest[..end].to_string());
+                    }
+                }
+            }
+        }
+    }
+
     for entry in WalkDir::new(directory) {
         let entry = entry?;
         let path = entry.path();
@@ -216,12 +232,28 @@ fn zip_directory(directory: &Path, writer: &mut File) -> Result<()> {
         }
 
         let name_string = name.to_string_lossy().replace('\\', "/");
+        
+        // Filter logic
+        if main_xml.exists() {
+            if entry.file_type().is_file() && !allowed_files.contains(&name_string) {
+                continue;
+            }
+        } else {
+            // Fallback: only include model files
+            if entry.file_type().is_file() {
+                let lower = name_string.to_lowercase();
+                if !lower.ends_with(".xml") && !lower.ends_with(".ksml") && !lower.ends_with(".yml") && !lower.ends_with(".yaml") {
+                    continue;
+                }
+            }
+        }
+
         if entry.file_type().is_dir() {
             zip.add_directory(format!("{name_string}/"), options.clone())?;
             continue;
         }
 
-        zip.start_file(name_string, options.clone())?;
+        zip.start_file(&name_string, options.clone())?;
         let mut file =
             File::open(path).with_context(|| format!("failed to open {}", path.display()))?;
         let mut buffer = Vec::new();
