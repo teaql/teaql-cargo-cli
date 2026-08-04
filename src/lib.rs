@@ -340,7 +340,6 @@ fn run_check(args: CheckArgs, cwd: PathBuf) -> Result<i32> {
                         &xml_path,
                         xml_line,
                         span,
-                        &cwd,
                     );
                     mapped = true;
                     break;
@@ -379,7 +378,12 @@ struct DiagnosticSpan {
 }
 
 fn try_map_span(cwd: &Path, span: &DiagnosticSpan) -> Option<(PathBuf, usize)> {
-    let file_path = cwd.join(&span.file_name);
+    let raw_path = PathBuf::from(&span.file_name);
+    let file_path = if raw_path.exists() {
+        raw_path
+    } else {
+        cwd.join(&span.file_name)
+    };
     if !file_path.exists() {
         return None;
     }
@@ -411,12 +415,11 @@ fn print_mapped_error(
     xml_path: &Path,
     xml_line: usize,
     span: &DiagnosticSpan,
-    cwd: &Path,
 ) {
     eprintln!("{}: {}", level, message);
     eprintln!("  --> {}:{}", xml_path.display(), xml_line);
 
-    let full_xml_path = cwd.join(xml_path);
+    let full_xml_path = PathBuf::from(xml_path);
     if full_xml_path.exists()
         && let Ok(content) = std::fs::read_to_string(&full_xml_path)
     {
