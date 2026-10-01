@@ -1,7 +1,7 @@
 use std::ffi::OsString;
 use std::path::PathBuf;
 
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 
 const ROOT_USAGE: &str = "cargo teaql [OPTIONS] [COMMAND]\n    cargo teaql [OPTIONS] <TARGET> --input <MODEL> [--output <DIR>]\n    cargo teaql [OPTIONS] <LANG>-assist-<ACTION>/<ENTITY>[.<FIELD>] --input <MODEL>";
 
@@ -20,6 +20,20 @@ const ROOT_EXAMPLES: &str = r#"REMOTE WORKFLOWS (dynamic commands):
   Ask model-aware Assist about an entity or one field:
     cargo teaql rust-assist-query/school --input models/
     cargo teaql rust-assist-query/school.established_date --input models/
+
+  Enforce expression-safe Rust read paths locally:
+    cargo teaql rust-expression-check --source src
+
+  Enforce E-expression relation access in Java application code:
+    cargo teaql java-expression-check --source src
+
+  Check other TeaQL language ecosystems with the same policy model:
+    cargo teaql kotlin-expression-check --source src
+    cargo teaql python-expression-check --source src
+    cargo teaql csharp-expression-check --source src
+    cargo teaql golang-expression-check --source src
+    cargo teaql swift-expression-check --source Sources
+    cargo teaql typescript-expression-check --source src
 
 Run `cargo teaql services` for the current remote target inventory.
 With no command, TeaQL runs `services`. `cargo-teaql` is an equivalent invocation."#;
@@ -88,6 +102,22 @@ pub enum Commands {
     InstallLinks(InstallLinksArgs),
     /// Run cargo check and map any compiler errors back to the source KSML (XML) file.
     Check(CheckArgs),
+    /// Enforce E-expression reads for application-owned Rust query paths.
+    RustExpressionCheck(RustExpressionCheckArgs),
+    /// Enforce E-expression relation access for application-owned Java code.
+    JavaExpressionCheck(JavaExpressionCheckArgs),
+    /// Enforce E-expression relation access for application-owned Kotlin code.
+    KotlinExpressionCheck(LanguageExpressionCheckArgs),
+    /// Enforce E-expression relation access for application-owned Python code.
+    PythonExpressionCheck(LanguageExpressionCheckArgs),
+    /// Enforce E-expression relation access for application-owned C# code.
+    CsharpExpressionCheck(LanguageExpressionCheckArgs),
+    /// Enforce E-expression relation access for application-owned Go code.
+    GolangExpressionCheck(LanguageExpressionCheckArgs),
+    /// Enforce E-expression relation access for application-owned Swift code.
+    SwiftExpressionCheck(LanguageExpressionCheckArgs),
+    /// Enforce E-expression relation access for application-owned TypeScript code.
+    TypescriptExpressionCheck(LanguageExpressionCheckArgs),
 
     #[command(external_subcommand)]
     Dynamic(Vec<OsString>),
@@ -134,6 +164,69 @@ pub struct CheckArgs {
     /// Pass additional arguments to cargo check (e.g. --workspace, --tests).
     #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
     pub cargo_args: Vec<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct RustExpressionCheckArgs {
+    /// Application-owned Rust source root to scan. Repeat for multiple roots.
+    #[arg(long = "source", value_name = "PATH")]
+    pub sources: Vec<PathBuf>,
+
+    /// Directory to exclude from scanning. Repeat for multiple roots.
+    #[arg(long = "exclude", value_name = "PATH")]
+    pub excludes: Vec<PathBuf>,
+
+    /// Policy file. Defaults to .teaql/rust-expression-check.yml when present.
+    #[arg(long, value_name = "FILE")]
+    pub config: Option<PathBuf>,
+
+    /// Diagnostic output format.
+    #[arg(long, value_enum, default_value_t = ExpressionCheckOutput::Text)]
+    pub format: ExpressionCheckOutput,
+}
+
+#[derive(Debug, Args)]
+pub struct JavaExpressionCheckArgs {
+    /// Application-owned Java source root to scan. Repeat for multiple roots.
+    #[arg(long = "source", value_name = "PATH")]
+    pub sources: Vec<PathBuf>,
+
+    /// Directory to exclude from scanning. Repeat for multiple roots.
+    #[arg(long = "exclude", value_name = "PATH")]
+    pub excludes: Vec<PathBuf>,
+
+    /// Policy file. Defaults to .teaql/java-expression-check.yml when present.
+    #[arg(long, value_name = "FILE")]
+    pub config: Option<PathBuf>,
+
+    /// Diagnostic output format.
+    #[arg(long, value_enum, default_value_t = ExpressionCheckOutput::Text)]
+    pub format: ExpressionCheckOutput,
+}
+
+#[derive(Debug, Args)]
+pub struct LanguageExpressionCheckArgs {
+    /// Application-owned source root to scan. Repeat for multiple roots.
+    #[arg(long = "source", value_name = "PATH")]
+    pub sources: Vec<PathBuf>,
+
+    /// Directory to exclude from scanning. Repeat for multiple roots.
+    #[arg(long = "exclude", value_name = "PATH")]
+    pub excludes: Vec<PathBuf>,
+
+    /// Language-specific expression policy file.
+    #[arg(long, value_name = "FILE")]
+    pub config: Option<PathBuf>,
+
+    /// Diagnostic output format.
+    #[arg(long, value_enum, default_value_t = ExpressionCheckOutput::Text)]
+    pub format: ExpressionCheckOutput,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+pub enum ExpressionCheckOutput {
+    Text,
+    Json,
 }
 
 #[derive(Debug, Args)]
@@ -215,6 +308,14 @@ mod tests {
         assert!(help.contains("cargo teaql evaluate --input models/"));
         assert!(help.contains("cargo teaql rust-lib-core --input models/"));
         assert!(help.contains("rust-assist-query/school.established_date"));
+        assert!(help.contains("cargo teaql rust-expression-check --source src"));
+        assert!(help.contains("cargo teaql java-expression-check --source src"));
+        assert!(help.contains("cargo teaql kotlin-expression-check --source src"));
+        assert!(help.contains("cargo teaql python-expression-check --source src"));
+        assert!(help.contains("cargo teaql csharp-expression-check --source src"));
+        assert!(help.contains("cargo teaql golang-expression-check --source src"));
+        assert!(help.contains("cargo teaql swift-expression-check --source Sources"));
+        assert!(help.contains("cargo teaql typescript-expression-check --source src"));
         assert!(help.contains("cargo teaql services"));
     }
 

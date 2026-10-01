@@ -1,6 +1,9 @@
 pub mod cli;
 pub mod config;
 pub mod generator;
+pub mod java_expression_check;
+pub mod polyglot_expression_check;
+pub mod rust_expression_check;
 pub mod service;
 
 use std::{
@@ -52,6 +55,54 @@ pub fn run_cli(cli: Cli) -> Result<()> {
         Commands::Check(args) => {
             let code = run_check(args, cli.cwd)?;
             std::process::exit(code);
+        }
+        Commands::RustExpressionCheck(args) => {
+            rust_expression_check::run(&cli.cwd, args)?;
+        }
+        Commands::JavaExpressionCheck(args) => {
+            java_expression_check::run(&cli.cwd, args)?;
+        }
+        Commands::KotlinExpressionCheck(args) => {
+            polyglot_expression_check::run(
+                &cli.cwd,
+                args,
+                polyglot_expression_check::Language::Kotlin,
+            )?;
+        }
+        Commands::PythonExpressionCheck(args) => {
+            polyglot_expression_check::run(
+                &cli.cwd,
+                args,
+                polyglot_expression_check::Language::Python,
+            )?;
+        }
+        Commands::CsharpExpressionCheck(args) => {
+            polyglot_expression_check::run(
+                &cli.cwd,
+                args,
+                polyglot_expression_check::Language::Csharp,
+            )?;
+        }
+        Commands::GolangExpressionCheck(args) => {
+            polyglot_expression_check::run(
+                &cli.cwd,
+                args,
+                polyglot_expression_check::Language::Golang,
+            )?;
+        }
+        Commands::SwiftExpressionCheck(args) => {
+            polyglot_expression_check::run(
+                &cli.cwd,
+                args,
+                polyglot_expression_check::Language::Swift,
+            )?;
+        }
+        Commands::TypescriptExpressionCheck(args) => {
+            polyglot_expression_check::run(
+                &cli.cwd,
+                args,
+                polyglot_expression_check::Language::Typescript,
+            )?;
         }
         Commands::Dynamic(args) => {
             if args.is_empty() {
