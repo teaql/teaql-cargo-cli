@@ -521,10 +521,22 @@ fn resolve_roots(cwd: &Path, cli: &[PathBuf], configured: &[PathBuf]) -> Result<
 }
 
 fn resolve_excludes(cwd: &Path, cli: &[PathBuf], configured: &[PathBuf]) -> Vec<PathBuf> {
-    cli.iter()
+    let mut excludes: Vec<PathBuf> = cli
+        .iter()
         .chain(configured)
         .map(|path| resolve(cwd, path))
-        .collect()
+        .collect();
+    let embedded_lib = cwd.join("lib");
+    if embedded_lib.join("pom.xml").is_file()
+        && embedded_lib.join("src/main/java").is_dir()
+        && WalkDir::new(embedded_lib.join("src/main/java"))
+            .into_iter()
+            .filter_map(|entry| entry.ok())
+            .any(|entry| entry.file_type().is_file() && entry.file_name() == "E.java")
+    {
+        excludes.push(embedded_lib);
+    }
+    excludes
 }
 
 fn resolve(cwd: &Path, path: &Path) -> PathBuf {
@@ -815,5 +827,28 @@ allow:
 
         assert!(report.findings.is_empty());
         assert_eq!(report.suppressed, 1);
+    }
+
+    #[test]
+    fn excludes_embedded_generated_library_but_not_application_code() {
+        let workspace = tempfile::tempdir().unwrap();
+        let root = workspace.path();
+        let generated = root.join("lib/src/main/java/example");
+        let application = root.join("src/main/java/example/App.java");
+        fs::create_dir_all(&generated).unwrap();
+        fs::create_dir_all(application.parent().unwrap()).unwrap();
+        fs::write(root.join("lib/pom.xml"), "<project/>").unwrap();
+        fs::write(generated.join("E.java"), "class E {}").unwrap();
+        fs::write(generated.join("Customer.java"), "class Customer {}").unwrap();
+        fs::write(&application, "class App {}").unwrap();
+        let excludes = resolve_excludes(root, &[], &[]);
+        let files = collect_java_files(
+            root,
+            &[root.to_path_buf()],
+            &excludes,
+            DEFAULT_EXCLUDED_COMPONENTS,
+        )
+        .unwrap();
+        assert_eq!(files, vec![application]);
     }
 }

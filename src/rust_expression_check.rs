@@ -236,10 +236,16 @@ fn resolve_roots(cwd: &Path, cli: &[PathBuf], configured: &[PathBuf]) -> Result<
 }
 
 fn resolve_excludes(cwd: &Path, cli: &[PathBuf], configured: &[PathBuf]) -> Vec<PathBuf> {
-    cli.iter()
+    let mut excludes: Vec<PathBuf> = cli
+        .iter()
         .chain(configured)
         .map(|path| resolve(cwd, path))
-        .collect()
+        .collect();
+    let embedded_lib = cwd.join("lib");
+    if embedded_lib.join("Cargo.toml").is_file() && embedded_lib.join("src/e.rs").is_file() {
+        excludes.push(embedded_lib);
+    }
+    excludes
 }
 
 fn resolve(cwd: &Path, path: &Path) -> PathBuf {
@@ -503,6 +509,26 @@ impl<'ast> Visit<'ast> for SignalVisitor {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn excludes_embedded_generated_library_but_not_application_code() {
+        let workspace = tempfile::tempdir().unwrap();
+        let root = workspace.path();
+        fs::create_dir_all(root.join("lib/src")).unwrap();
+        fs::create_dir_all(root.join("src")).unwrap();
+        fs::write(
+            root.join("lib/Cargo.toml"),
+            "[package]\nname = \"generated\"\nversion = \"0.1.0\"\n",
+        )
+        .unwrap();
+        fs::write(root.join("lib/src/e.rs"), "pub struct E;\n").unwrap();
+        fs::write(root.join("lib/src/lib.rs"), "pub mod e;\n").unwrap();
+        let application = root.join("src/main.rs");
+        fs::write(&application, "fn main() {}\n").unwrap();
+        let excludes = resolve_excludes(root, &[], &[]);
+        let files = collect_rust_files(root, &[root.to_path_buf()], &excludes).unwrap();
+        assert_eq!(files, vec![application]);
+    }
 
     fn check_fixture(source: &str, policy: &str) -> Result<Report> {
         let temp = tempfile::tempdir()?;
