@@ -85,9 +85,9 @@ pub fn run(cwd: &Path, args: LanguageExpressionCheckArgs, language: Language) ->
     validate_policy(&policy, policy_path.as_deref(), language)?;
 
     let roots = resolve_roots(&cwd, &args.sources, &policy.source_roots)?;
-    let excludes = resolve_excludes(&cwd, &args.excludes, &policy.exclude_roots);
+    let excludes = resolve_excludes(&cwd, &args.excludes, &policy.exclude_roots, language);
     let files = collect_source_files(&cwd, &roots, &excludes, language)?;
-    let nearby = nearby_catalog_roots(&cwd);
+    let nearby = nearby_catalog_roots(&cwd, language);
     let mut relations = discover_model_relations(&nearby)?;
     relations.extend(policy.relation_members.iter().map(|member| Relation {
         owner: "entity".to_string(),
@@ -155,7 +155,7 @@ fn analyze_sources(
         let chains = scan_member_chains(&masked);
         let expression_ranges = chains
             .iter()
-            .filter(|chain| chain.segments.first().is_some_and(|root| root == "E"))
+            .filter(|chain| is_e_expression_chain(chain))
             .map(|chain| (chain.start_byte, chain.end_byte))
             .collect::<Vec<_>>();
         let relative_path = display_path(cwd, path);
@@ -246,6 +246,12 @@ fn matched_relation<'a>(
                     || chain.called.get(*index).copied().unwrap_or(false))
         })
         .map(|(index, segment)| (index, segment.as_str()))
+}
+
+fn is_e_expression_chain(chain: &MemberChain) -> bool {
+    // Generated facades may be imported directly (`E.customer`) or through a
+    // package/namespace (`lib.E.Customer`, `Generated.E.Customer`).
+    chain.segments.iter().take(3).any(|segment| segment == "E")
 }
 
 fn relation_for_member<'a>(
@@ -703,11 +709,34 @@ fn resolve_roots(cwd: &Path, cli: &[PathBuf], configured: &[PathBuf]) -> Result<
         .collect()
 }
 
-fn resolve_excludes(cwd: &Path, cli: &[PathBuf], configured: &[PathBuf]) -> Vec<PathBuf> {
-    cli.iter()
+fn resolve_excludes(
+    cwd: &Path,
+    cli: &[PathBuf],
+    configured: &[PathBuf],
+    language: Language,
+) -> Vec<PathBuf> {
+    let mut excludes: Vec<PathBuf> = cli
+        .iter()
         .chain(configured)
         .map(|path| resolve(cwd, path))
-        .collect()
+        .collect();
+    // These directories are generator-owned only when the workspace also has
+    // the generated facade and runtime module. A normal application may own
+    // directories with the same names and must remain visible to the gate.
+    match language {
+        Language::Python
+            if cwd.join("E.py").is_file() && cwd.join("runtime_module.py").is_file() =>
+        {
+            excludes.extend([cwd.join("models"), cwd.join("requests")]);
+        }
+        Language::Csharp
+            if cwd.join("E.cs").is_file() && cwd.join("GeneratedRuntimeModule.cs").is_file() =>
+        {
+            excludes.extend([cwd.join("Models"), cwd.join("Requests")]);
+        }
+        _ => {}
+    }
+    excludes
 }
 
 fn resolve(cwd: &Path, path: &Path) -> PathBuf {
@@ -718,21 +747,21 @@ fn resolve(cwd: &Path, path: &Path) -> PathBuf {
     }
 }
 
-fn nearby_catalog_roots(cwd: &Path) -> Vec<PathBuf> {
+fn nearby_catalog_roots(cwd: &Path, language: Language) -> Vec<PathBuf> {
     let mut roots = vec![cwd.to_path_buf()];
-    let mut current = cwd;
-    for _ in 0..3 {
-        if current.join(".git").exists() {
-            break;
+    let sibling_name = match language {
+        Language::Kotlin => "java-lib-core",
+        Language::Python => "python-lib-core",
+        Language::Csharp => "dotnet-lib-core",
+        Language::Golang => "golang-lib-core",
+        Language::Swift => "swift-lib-core",
+        Language::Typescript => "typescript-lib-core",
+    };
+    if let Some(parent) = cwd.parent() {
+        let sibling = parent.join(sibling_name);
+        if sibling.is_dir() {
+            roots.push(sibling);
         }
-        let Some(parent) = current.parent() else {
-            break;
-        };
-        if parent == Path::new("/") {
-            break;
-        }
-        roots.push(parent.to_path_buf());
-        current = parent;
     }
     roots
 }
@@ -1037,8 +1066,18 @@ impl Language {
             .unwrap_or("");
         match self {
             Self::Kotlin => false,
-            Self::Python => name == "expression.py",
-            Self::Csharp => matches!(name, "E.cs" | "Q.cs" | "GeneratedRuntimeModule.cs"),
+            Self::Python => matches!(
+                name,
+                "expression.py"
+                    | "E.py"
+                    | "Q.py"
+                    | "runtime_module.py"
+                    | "generated_search_models.py"
+            ),
+            Self::Csharp => matches!(
+                name,
+                "E.cs" | "Q.cs" | "GeneratedRuntimeModule.cs" | "GeneratedSearchModels.cs"
+            ),
             Self::Golang => matches!(
                 name,
                 "e.go" | "q.go" | "runtime.go" | "entity.go" | "expression.go" | "request.go"
@@ -1058,7 +1097,7 @@ impl Language {
             .unwrap_or("");
         match self {
             Self::Kotlin => name == "E.java",
-            Self::Python => name == "expression.py" || name == "e.py",
+            Self::Python => matches!(name, "expression.py" | "e.py" | "E.py"),
             Self::Csharp => name == "E.cs",
             Self::Golang => name == "e.go",
             Self::Swift => name == "E.swift",
@@ -1138,7 +1177,7 @@ mod tests {
         let chains = scan_member_chains(&masked);
         let expression_ranges = chains
             .iter()
-            .filter(|chain| chain.segments.first().is_some_and(|root| root == "E"))
+            .filter(|chain| is_e_expression_chain(chain))
             .map(|chain| (chain.start_byte, chain.end_byte))
             .collect::<Vec<_>>();
         chains
@@ -1197,6 +1236,18 @@ mod tests {
                 "RelationEntity"
             ),
             1
+        );
+    }
+
+    #[test]
+    fn accepts_qualified_go_expression_facade() {
+        assert_eq!(
+            findings(
+                "package app\nfunc render(customer *Customer) { lib.E.Customer(customer).Platform().Name().Eval() }",
+                Language::Golang,
+                "Platform"
+            ),
+            0
         );
     }
 
@@ -1298,5 +1349,71 @@ mod tests {
         assert_eq!(pascal_case("school_type"), "SchoolType");
         assert_eq!(lower_camel("school_type"), "schoolType");
         assert_eq!(snake_case("SchoolType"), "school_type");
+    }
+
+    #[test]
+    fn generated_python_console_uses_uppercase_facade_and_scans_only_application_code() {
+        let workspace = tempfile::tempdir().unwrap();
+        let root = workspace.path();
+        fs::create_dir_all(root.join("app")).unwrap();
+        fs::create_dir_all(root.join("models")).unwrap();
+        fs::create_dir_all(root.join("requests")).unwrap();
+        fs::write(
+            root.join("model.xml"),
+            r#"<root><platform name="string()"/><customer platform="platform()"/></root>"#,
+        )
+        .unwrap();
+        fs::write(
+            root.join("E.py"),
+            "class E:\n    def customer(value):\n        return value\n",
+        )
+        .unwrap();
+        fs::write(
+            root.join("runtime_module.py"),
+            "GENERATED_RUNTIME_MODULE = None\n",
+        )
+        .unwrap();
+        fs::write(root.join("models/customer.py"), "class Customer: pass\n").unwrap();
+        fs::write(
+            root.join("requests/customer_request.py"),
+            "class Request: pass\n",
+        )
+        .unwrap();
+        let application = root.join("app/main.py");
+        fs::write(
+            &application,
+            "def render(customer):\n    return E.customer(customer).platform().name().eval()\n",
+        )
+        .unwrap();
+
+        let args = || LanguageExpressionCheckArgs {
+            sources: vec![PathBuf::from(".")],
+            excludes: Vec::new(),
+            config: None,
+            format: ExpressionCheckOutput::Json,
+        };
+        run(root, args(), Language::Python).unwrap();
+        let excludes = resolve_excludes(root, &[], &[], Language::Python);
+        let files =
+            collect_source_files(root, &[root.to_path_buf()], &excludes, Language::Python).unwrap();
+        assert_eq!(files, vec![application.clone()]);
+
+        fs::write(
+            &application,
+            "def render(customer):\n    return customer.platform.name\n",
+        )
+        .unwrap();
+        let error = run(root, args(), Language::Python).unwrap_err();
+        assert!(error.to_string().contains("found 1 violation"));
+    }
+
+    #[test]
+    fn catalog_search_is_bounded_to_workspace_and_known_sibling() {
+        let parent = tempfile::tempdir().unwrap();
+        let app = parent.path().join("golang-app-console");
+        let lib = parent.path().join("golang-lib-core");
+        fs::create_dir(&app).unwrap();
+        fs::create_dir(&lib).unwrap();
+        assert_eq!(nearby_catalog_roots(&app, Language::Golang), vec![app, lib]);
     }
 }
