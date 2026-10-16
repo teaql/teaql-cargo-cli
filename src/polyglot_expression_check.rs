@@ -623,10 +623,19 @@ fn line_is_import(source: &str, byte: usize, language: Language) -> bool {
         .map(|index| byte + index)
         .unwrap_or(source.len());
     let line = source[start..end].trim_start();
+    let before = source[start..byte].trim_start();
+    if before.contains(';') {
+        return false;
+    }
+    if language == Language::Csharp && line.starts_with("namespace ") {
+        // A block namespace can share a line with application code. Only the
+        // namespace header itself is a declaration, not the whole line.
+        return !before.contains('{');
+    }
     match language {
         Language::Kotlin => line.starts_with("import ") || line.starts_with("package "),
         Language::Python => line.starts_with("import ") || line.starts_with("from "),
-        Language::Csharp => line.starts_with("using ") || line.starts_with("namespace "),
+        Language::Csharp => line.starts_with("using "),
         Language::Golang => line.starts_with("package ") || line.starts_with("import "),
         Language::Swift => line.starts_with("import "),
         Language::Typescript => line.starts_with("import "),
@@ -1225,6 +1234,24 @@ mod tests {
             ),
             1
         );
+    }
+
+    #[test]
+    fn detects_csharp_relation_chain_inside_one_line_namespace() {
+        assert_eq!(
+            findings(
+                "namespace Generated { class PolicyProbe { string? Render(Models.Customer customer) => customer.PlatformEntity?.Name; } }",
+                Language::Csharp,
+                "PlatformEntity"
+            ),
+            1
+        );
+        let source = "namespace Generated { class PolicyProbe { string? Render(Models.Customer customer) => customer.PlatformEntity?.Name; } }";
+        assert!(!line_is_import(
+            source,
+            source.find("customer.PlatformEntity").unwrap(),
+            Language::Csharp
+        ));
     }
 
     #[test]
