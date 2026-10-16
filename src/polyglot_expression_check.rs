@@ -743,6 +743,21 @@ fn resolve_excludes(
         {
             excludes.extend([cwd.join("Models"), cwd.join("Requests")]);
         }
+        Language::Swift if cwd.join("Sources/GeneratedTeaQL/E.swift").is_file() => {
+            excludes.push(cwd.join("Package.swift"));
+        }
+        Language::Typescript
+            if cwd.join("src/generated/E.ts").is_file()
+                && cwd.join("src/generated-bootstrap.ts").is_file() =>
+        {
+            excludes.extend([
+                cwd.join("src/generated-search-models.ts"),
+                cwd.join("src/runtime-module.ts"),
+                cwd.join("src/teaql-ts.ts"),
+                cwd.join("src/teaql-node-sql.ts"),
+                cwd.join("src/teaql-node-sqlite.ts"),
+            ]);
+        }
         _ => {}
     }
     excludes
@@ -1442,5 +1457,34 @@ mod tests {
         fs::create_dir(&app).unwrap();
         fs::create_dir(&lib).unwrap();
         assert_eq!(nearby_catalog_roots(&app, Language::Golang), vec![app, lib]);
+    }
+
+    #[test]
+    fn generated_typescript_console_excludes_runtime_copies_but_keeps_app_code() {
+        let workspace = tempfile::tempdir().unwrap();
+        let root = workspace.path();
+        fs::create_dir_all(root.join("src/generated")).unwrap();
+        fs::write(
+            root.join("src/generated/E.ts"),
+            "export class E { static customer(value: unknown) { return value; } }",
+        )
+        .unwrap();
+        fs::write(
+            root.join("src/generated-bootstrap.ts"),
+            "export const bootstrap = true;\n",
+        )
+        .unwrap();
+        fs::write(
+            root.join("src/teaql-ts.ts"),
+            "export const runtime = true;\n",
+        )
+        .unwrap();
+        let application = root.join("src/main.ts");
+        fs::write(&application, "export const app = true;\n").unwrap();
+        let excludes = resolve_excludes(root, &[], &[], Language::Typescript);
+        let files =
+            collect_source_files(root, &[root.to_path_buf()], &excludes, Language::Typescript)
+                .unwrap();
+        assert_eq!(files, vec![application]);
     }
 }
