@@ -180,7 +180,7 @@ fn extract_zip(zip_bytes: &[u8], output_dir: &Path) -> Result<()> {
         };
         let output_path = output_dir.join(enclosed);
 
-        if entry.name().ends_with('/') {
+        if entry.name()?.ends_with('/') {
             fs::create_dir_all(&output_path)
                 .with_context(|| format!("failed to create {}", output_path.display()))?;
             continue;
@@ -201,7 +201,7 @@ fn extract_zip(zip_bytes: &[u8], output_dir: &Path) -> Result<()> {
 
 fn zip_directory(directory: &Path, writer: &mut File) -> Result<()> {
     let mut zip = ZipWriter::new(writer);
-    let options: FileOptions<'_, ExtendedFileOptions> =
+    let options: FileOptions<'_, '_, ExtendedFileOptions> =
         FileOptions::default().compression_method(CompressionMethod::Deflated);
 
     let mut allowed_files = Vec::new();
@@ -375,6 +375,25 @@ mod tests {
             fs::read_to_string(output_dir.join("nested").join("child.xml")).unwrap(),
             "child"
         );
+    }
+
+    #[test]
+    fn extract_zip_keeps_parent_paths_outside_output_directory() {
+        let temp = tempdir().unwrap();
+        let mut writer = ZipWriter::new(Cursor::new(Vec::new()));
+        let options: FileOptions<'_, '_, ExtendedFileOptions> =
+            FileOptions::default().compression_method(CompressionMethod::Deflated);
+        writer.start_file("../escape.txt", options.clone()).unwrap();
+        writer.write_all(b"outside").unwrap();
+        writer.start_file("safe.txt", options).unwrap();
+        writer.write_all(b"inside").unwrap();
+        let bytes = writer.finish().unwrap().into_inner();
+
+        let output_dir = temp.path().join("out");
+        extract_zip(&bytes, &output_dir).unwrap();
+
+        assert!(!temp.path().join("escape.txt").exists());
+        assert_eq!(fs::read(output_dir.join("safe.txt")).unwrap(), b"inside");
     }
 
     fn create_fixture_tree(base: &Path) -> PathBuf {
